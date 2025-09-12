@@ -1,0 +1,89 @@
+# depslib dependency file v1.0
+1707407822 source:c:\programming\translational_genomics\apply_cnv\apply_cnv\utils.cpp
+	"utils.h"
+
+1707402172 c:\programming\translational_genomics\apply_cnv\apply_cnv\utils.h
+	<bits/stdc++.h>
+	<ctime>
+	<iomanip>
+	<iostream>
+	<sstream>
+	<vector>
+	"params.h"
+
+1720195009 c:\programming\translational_genomics\apply_cnv\apply_cnv\params.h
+	<string>
+	<vector>
+
+1716996385 source:c:\programming\translational_genomics\apply_cnv\apply_cnv\load.cpp
+	"load.h"
+
+1716996146 c:\programming\translational_genomics\apply_cnv\apply_cnv\load.h
+	<fstream>
+	<iostream>
+	"params.h"
+	"utils.h"
+
+1720104674 source:c:\programming\translational_genomics\apply_cnv\apply_cnv\correct_cnvs.cpp
+	"correct_cnvs.h"
+
+1716998483 c:\programming\translational_genomics\apply_cnv\apply_cnv\correct_cnvs.h
+	<fstream>
+	<iostream>
+	<windows.h>
+	"load.h"
+	"params.h"
+	"utils.h"
+
+1720107828 source:c:\programming\translational_genomics\apply_cnv\apply_cnv\main.cpp
+	<iostream>
+	<mutex>
+	"correct_cnvs.h"
+	"load.h"
+	"params.h"
+	"utils.h"
+
+1741890207 source:c:\programming\translational_genomics\nmd_analysis\apply_cnv\correct_cnvs.cpp
+	"correct_cnvs.h"
+
+1739293397 c:\programming\translational_genomics\nmd_analysis\apply_cnv\correct_cnvs.h
+	<fstream>
+	<iostream>
+	<windows.h>
+	"load.h"
+	"params.h"
+	"utils.h"
+
+1716996146 c:\programming\translational_genomics\nmd_analysis\apply_cnv\load.h
+	<fstream>
+	<iostream>
+	"params.h"
+	"utils.h"
+
+1749657340 c:\programming\translational_genomics\nmd_analysis\apply_cnv\params.h
+	<string>
+	<vector>
+
+1739301262 c:\programming\translational_genomics\nmd_analysis\apply_cnv\utils.h
+	<bits/stdc++.h>
+	<ctime>
+	<iomanip>
+	<iostream>
+	<sstream>
+	<vector>
+	"params.h"
+
+1716996385 source:c:\programming\translational_genomics\nmd_analysis\apply_cnv\load.cpp
+	"load.h"
+
+1707407822 source:c:\programming\translational_genomics\nmd_analysis\apply_cnv\utils.cpp
+	"utils.h"
+
+1741866328 source:c:\programming\translational_genomics\nmd_analysis\apply_cnv\main.cpp
+	<iostream>
+	<mutex>
+	"correct_cnvs.h"
+	"load.h"
+	"params.h"
+	"utils.h"
+

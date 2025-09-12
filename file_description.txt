@@ -1,0 +1,37 @@
+< internal data
+filename						description
+tcga_data_info.json					overview of TCGA files (CNV, expression, and WXS)
+hg19_knownGene.txt					hg19 build version, downloaded from UCSC
+hg38_knownGene.txt					hg38 build version, downloaded from UCSC
+hg38_knownGene_old.txt					older hg38 build version, downloaded from UCSC, used for CNV correction
+hg38_NMD_susceptibilities.txt				susceptibility predictions created with NMDelphi
+hg38_seqs.txt						extracted coding sequences for hg38
+model_test_variants.txt				^	PTC variants of test dataset (ASE calls from Cuomo et al.)*
+model_training_variants.txt				PTC variants of training dataset (ASE calls from Teran et al.)*
+model_training_variants_full.txt			PTC variants of training dataset (ASE calls from Teran et al.) with redundant PTC variants (used for estimating maximum achievable performance)*
+msk_chord_variants.txt					PTC variants of MSK-CHORD dataset
+msk_chord_survival_analysis.txt				survival data of MSK-CHORD patients alongside info on NMD susceptibility 
+msk_mutation_stats.json					mutation statistics derived from TCGA (site-specific) and MSK-CHORD (gene-specific)
+tcga_avg_expressions.txt				average expressions for genes in TCGA projects
+tcga_hla_mutations.txt					HLA mutations per TCGA patient
+tcga_immune_editing.txt					immune editing scores from Gong and Karchin 2022
+tcga_mutation_stats.json				mutation statistics derived from TCGA only
+tcga_nmd_mutations.txt					NMD mutations per TCGA patient
+tcga_nmd_targets_analysis.txt				contains patient- and project-resolved expression values of bonafide NMD targets alongside mutational information
+tcga_variants.txt					PTC variants of TCGA dataset
+
+*values for distance to last EJC changed if genes consist of single exon using shared/tools.py, mode="change_defaults"
+
+
+< external data
+hg19 (directory)					downloaded from https://hgdownload.cse.ucsc.edu/goldenpath/hg19/bigZips/, reformatted using shared/tools.py, mode="convert_genomes"
+hg38 (directory)					downloaded from https://hgdownload.cse.ucsc.edu/goldenpath/hg38/bigZips/p14/, reformatted using shared/tools.py, mode="convert_genomes"
+hg19_NMDetectiveA_Lindeboom_et_al.v2.gtf		NMDetectiveA predictions for hg19, Lindeboom et al. 2019
+hg38_NMDetectiveA_Lindeboom_et_al.v2.gtf		NMDetectiveA predictions for hg38, Lindeboom et al. 2019
+hg38_lindeboom_predictions.txt				restructured NMDetectiveA predictions for hg38, calculated by random_forest/analyze_predictions, mode="convert_lindeboom_predictions"
+mmc4.txt						modified training dataset from Teran et al. 2021
+tcga_survival_data.txt					TCGA survival data, Liu et al. 2018
+tcga_immune_scores.txt					immune score predictions from https://bioinformatics.mdanderson.org/estimate/
+TCGA.PanCancer.onco.genes.OncoVar.tsv			driver gene classification, Wang et al. 2021
+tcga_rna_example					example data to infer RNA genes
+wt_nmd_targets.txt					wt NMD targets and non-targets from Wang et al. 2017
