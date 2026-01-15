@@ -2,11 +2,11 @@ import gzip
 import hashlib
 import json
 import numpy as np
+import os
 import pandas as pd
-from progress.bar import IncrementalBar
-from scipy import stats
 import sys
-sys.path.insert(0, r"C:\Programming\Translational_genomics\NMD_analysis\shared")
+parent_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
+sys.path.insert(0, parent_dir+"\\shared")
 
 from extract_mutations_utils import *
 from shared_utils import *
@@ -57,14 +57,12 @@ def _compare_status(status):
                                 if type(status[key1][key2][key3]) == dict and (type(status[key1][key2][key3][key4]) == dict or type(status[key1][key2][key3][key4]) == list):
                                     for key5 in status[key1][key2][key3][key4]:
                                         full_key = key1+"_"+key2+"_"+key3+"_"+key4
-                                        #if key3 == "b6b1dc9a-91f4-4b0a-afd5-62c9a90c0d5e": print(full_key, key5)
                                         if type(status[key1][key2][key3][key4]) == dict: converted_status.append(full_key+status[key1][key2][key3][key4][key5])
                                         if type(status[key1][key2][key3][key4]) == list and type(key5) != list: converted_status.append(full_key+"_"+key5)
 
                                 else:
                                     if type(status[key1][key2][key3]) == dict: converted_status.append(full_key+status[key1][key2][key3][key4])
                                     if type(status[key1][key2][key3]) == list: converted_status.append(full_key+"_"+key4)
-                                    #print(full_key+"_"+key4)
 
                         else:
                             if type(status[key1][key2][key3]) == dict: converted_status.append(full_key+"_"+status[key1][key2][key3])
@@ -88,14 +86,6 @@ def compare_status(status1, status2):
     mismatches2 = [entry for entry in converted_status2 if entry not in converted_status1]
 
     print("<", len(mismatches1), "/", len(mismatches2), "were detected")
-    #print("mismatches1")
-    #for i, mismatch in enumerate(mismatches1):
-    #    print(i, mismatch)
-
-    #print("mismatches2")
-    #for i, mismatch in enumerate(mismatches2):
-    #    print(i, mismatch)
-
     return {"status1": sorted(mismatches1), "status2": sorted(mismatches2)}
 
 
@@ -113,8 +103,6 @@ def convert_cancer_scores(cancer_scores, feature_targets, id_targets, label_targ
                 for j in range(len(values)):
                     data["FEATURE:"+feature.replace("FEATURE:", "").replace("ID:", "")].append(values[j])
                     
-                    #if values[j] == -1 and len(data["FEATURE:"+feature.replace("FEATURE:", "").replace("ID:", "")])-1 not in excluded_index:
-                    #    excluded_index.append(len(data["FEATURE:"+feature.replace("FEATURE:", "").replace("ID:", "")])-1)
                     if pd.isna(values[j]) == True and len(data["FEATURE:"+feature.replace("FEATURE:", "").replace("ID:", "")])-1 not in excluded_index:
                         excluded_index.append(len(data["FEATURE:"+feature.replace("FEATURE:", "").replace("ID:", "")])-1)
 
@@ -133,8 +121,6 @@ def convert_cancer_scores(cancer_scores, feature_targets, id_targets, label_targ
             for j in range(len(values)):
                 data["LABEL:"+label.replace("FEATURE:", "").replace("ID:", "")].append(values[j])
 
-                #if values[j] == -1 and len(data["LABEL:"+label.replace("FEATURE:", "").replace("ID:", "")])-1 not in excluded_index:
-                #    excluded_index.append(len(data["LABEL:"+label.replace("FEATURE:", "").replace("ID:", "")])-1)
                 if pd.isna(values[j]) == True and len(data["LABEL:"+label.replace("FEATURE:", "").replace("ID:", "")])-1 not in excluded_index:
                     excluded_index.append(len(data["LABEL:"+label.replace("FEATURE:", "").replace("ID:", "")])-1)
 
@@ -184,7 +170,6 @@ def get_cds_size(hg, transcript_id):
     cds_size   = 0
     exonsstart = [int(i) for i in hg.loc[transcript_id].loc["exonsstart"].split(",") if len(i) > 0] # condition required because last letter is a comma
     exonsend   = [int(i) for i in hg.loc[transcript_id].loc["exonsend"].split(",") if len(i) > 0] # condition required because last letter is a comma
-    #print(transcript_id)
 
     for i in range(len(exonsend)):
         if ((exonsstart[i] >= hg.loc[transcript_id].loc["cdsstart"] and exonsstart[i] < hg.loc[transcript_id].loc["cdsend"])
@@ -196,8 +181,7 @@ def get_cds_size(hg, transcript_id):
             if hg.loc[transcript_id].loc["cdsend"] <= exonsend[i]:     exon_cdsend   = hg.loc[transcript_id].loc["cdsend"]
             if hg.loc[transcript_id].loc["cdsend"] > exonsend[i]:      exon_cdsend   = exonsend[i]
             cds_size += exon_cdsend-exon_cdsstart
-            #print("i1", i, cds_size, hg.loc[transcript_id].loc["cdsstart"], ":", exonsstart[i], "/", exon_cdsstart, ":", hg.loc[transcript_id].loc["cdsend"], exonsend[i], "/", exon_cdsend)
-        #print("i0", i, cds_size, hg.loc[transcript_id].loc["cdsstart"], ":", exonsstart[i], ":", hg.loc[transcript_id].loc["cdsend"], exonsend[i])
+
     return cds_size
 
 
@@ -224,14 +208,10 @@ def get_values(cancer_scores, feature_filter, feature1, feature2, it, ptc_target
 
         for i, col in enumerate(feature_filter):
             if remove_misses == False:
-                #excluded_index.extend([j for j in range(len(filter_values[i])) if filter_values[i][j] != -1 and np.isnan(filter_values[i][j]) == False
-                #                      and (filter_values[i][j] >= feature_filter[col][0] or filter_values[i][j] < feature_filter[col][1])])
                 excluded_index.extend([j for j in range(len(filter_values[i])) if pd.isna(filter_values[i][j]) == False
                                        and (filter_values[i][j] >= feature_filter[col][0] or filter_values[i][j] < feature_filter[col][1])])
 
             if remove_misses == True:
-                #excluded_index.extend([j for j in range(len(filter_values[i])) if filter_values[i][j] == -1 or np.isnan(filter_values[i][j]) == True
-                #                       or filter_values[i][j] >= feature_filter[col][0] or filter_values[i][j] < feature_filter[col][1]])
                 excluded_index.extend([j for j in range(len(filter_values[i])) if pd.isna(filter_values[i][j]) == True
                                        or filter_values[i][j] >= feature_filter[col][0] or filter_values[i][j] < feature_filter[col][1]])
             
@@ -250,7 +230,6 @@ def get_values(cancer_scores, feature_filter, feature1, feature2, it, ptc_target
         values1      = [values1[i] for i in range(len(values1)) if sample_names[i] in class_samples]
         values2      = [values2[i] for i in range(len(values2)) if sample_names[i] in class_samples]
         values3      = [values3[i] for i in range(len(values3)) if sample_names[i] in class_samples]
-        #sample_names = class_samples
         sample_names = [sample_names[i] for i in range(len(sample_names)) if sample_names[i] in class_samples]
 
     if get_sample_names == False: return values1, values2, values3
@@ -267,11 +246,9 @@ def map_data(data, features, target_cols, text="", tag="FEATURE"):
         for feature in features:
             if i != "-":
                 if data[1].iloc[int(i)].loc[feature] != "#NV": mapped_features[feature].append(data[1].iloc[int(i)].loc[feature])
-                #else:                                          mapped_features[feature].append(-1)
                 else:                                          mapped_features[feature].append(None)
 
             else:
-                #mapped_features[feature].append(-1)
                 mapped_features[feature].append(None)
 
 

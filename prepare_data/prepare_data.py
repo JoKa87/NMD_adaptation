@@ -11,8 +11,9 @@ parent_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
 params = {
          "block_identifier":  "ID:variant id",
          "cohorts":           5,
-         "datatype":          "tcga", # "mskcc" "teran" "tcga"
+         "datatype":          "teran", # "control" "mskcc" "teran" "tcga"
          "delimiters":        None,
+         "dictionary_file":   "gene_symbol_ucid_dictionary_with_synonyms_manual_edit.txt",
          "data_dir":          parent_dir+r"\data",
          "error_handling":    { # defines handling of errors during sequence information extraction (True means excluding errors)
                               "chromosome_incompatible"         : True, # in absolute mode, alternative chromosomes cannot be used
@@ -21,13 +22,15 @@ params = {
                               "inconsistent_cds_size"           : True, # only applied if value is provided
                               "motif_start_not_found"           : True,
                               "mutated_wt_base_not_found"       : False,
+                              # marked (<-) added on 260109 to treat error in novel get_read_through_motif function
+                              "mutated_stop_codon_not_found"    : False,
                               # marked (<-) added to account for no cds (relevant for calculation of "FEATURE:cds EJC density" and "FEATURE:downstream cds EJC density")
                               "no_cds"                          : True, # <-
                               "no_exons"                        : True,
                               "no_start"                        : True,
                               "no_stop"                         : True,
                               "ptc_cds_index_not_found"         : True,
-                              "ptc_equals_stop_codon"           : True,
+                              "ptc_equals_stop_codon"           : False,
                               "ptc_exon_index_not_found"        : True,
                               "ptc_not_in_cds"                  : True,
                               "ptc_not_in_exon"                 : True,
@@ -43,7 +46,6 @@ params = {
                                "FEATURE:cds EJC density", "FEATURE:downstream cds EJC density", # <- added
                                "FEATURE:ptc upstream distance", "FEATURE:ptc downstream distance", "FEATURE:dist. from last EJC",
                                "FEATURE:ptc cds position", "FEATURE:ptc exon position", "FEATURE:ptc-wt stop codon distance",
-                               # marked (<-) features added on 250425 to integrate additional features (+ cds specific features)
                                "FEATURE:last exon", "FEATURE:last cds exon", "FEATURE:50 nt to last EJC", "FEATURE:50 nt to last cds EJC", "FEATURE:ptc exon size", # <- added
 
                                "FEATURE:total start count cds", "FEATURE:upstream start ptc count cds", "FEATURE:downstream start ptc count cds",
@@ -53,8 +55,10 @@ params = {
 
                                "FEATURE:total GC count exons", "FEATURE:upstream GC ptc count exons", "FEATURE:downstream GC ptc count exons",
                                "FEATURE:total GC count ptc exon", "FEATURE:upstream GC ptc count ptc exon", "FEATURE:downstream GC ptc count ptc exon",
-                               
-                               "FEATURE:5'utr", "FEATURE:ptc cds", "FEATURE:ptc", "FEATURE:5'ptc", "FEATURE:3'ptc", "FEATURE:5'ejc", "FEATURE:3'ejc", "FEATURE:3'utr", "FEATURE:all cds", "FEATURE:all exons"],
+                               # marked (<-) features added on 260109 to integrate read-through motifs
+                               "FEATURE:read-through+1", "FEATURE:read-through+2",
+                               "FEATURE:5'utr", "FEATURE:ptc cds", "FEATURE:ptc", "FEATURE:5'ptc", "FEATURE:3'ptc", "FEATURE:5'ejc", "FEATURE:3'ejc",
+                               "FEATURE:3'utr", "FEATURE:all cds", "FEATURE:all exons"],
          "file_tags":         None,
          "full_output":       True, # True means no averaging over identical variants
          "hg_build":          ["hg38"], #["hg19", "hg38"], priority list for hg builds
@@ -68,7 +72,7 @@ params = {
          "motif_inframe":     {"start": True, "GC": False},
          "motif_relative":    {"start": False, "GC": True},
          "os_sep":             "//",
-         "outfname":           "tcga_primary",
+         "outfname":           "teran_read_through",
          "output_type":        "analytical", # if "analytical" is chosen, missing NMD scores are not dropped, basal expression is inferred from project-specific average (TCGA)
          "pattern_cutoff":     5, # inclusive threshold for the minimum number of bases to determine a pattern (e.g. GC content); if below, default value is used instead
          "ptc_cutoff":         None,
@@ -87,19 +91,22 @@ if params["motifs_combined"] == True:                                      param
 if params["full_output"] == True and params["weighed_output"] == True:     print("< warning. full_output=True and weighed_output=True are mutually exclusive.")
 if params["output_type"] == "analytical" and params["datatype"] != "tcga": print("< warning. output_type is set to 'analytical' which is applied to tcga data only.")
 
-# marked (<-) newly added on 250425 to calculate with shifted relative PTC index (+2) to avoid assignment to wrong exons of full stop codon
-if len([params["ptc_mode"][key] for key in params["ptc_mode"] if params["ptc_mode"][key] == "absolute"]) > 0: # <-
-    print("< absolute mode is currently not supported.") # <-
-    exit() # <-
+if len([params["ptc_mode"][key] for key in params["ptc_mode"] if params["ptc_mode"][key] == "absolute"]) > 0:
+    print("< absolute mode is currently not supported.")
+    exit()
 
 # default settings depending on datatypes
+if params["datatype"] == "control":
+    params["delimiters"] = [","]
+    params["file_tags"]  = ["control_raw.txt"]
+
 if params["datatype"] == "mskcc":
     params["delimiters"] = ["\t"]
     params["file_tags"]  = ["msk_chord_data_mutations.txt"]
 
 if params["datatype"] == "tcga":
     params["delimiters"] = ["\t"]
-    params["file_tags"]  = ["tcga_primary_raw.txt"]
+    params["file_tags"]  = ["cptac3_raw.txt"]
 
 if params["datatype"] == "teran":
     params["delimiters"] = [" ", ","]
@@ -113,6 +120,12 @@ def main():
         file_tag = params["file_tags"][i]
         with open(params["data_dir"]+params["os_sep"]+file_tag, 'r') as _:
             data.append(pd.read_csv(params["data_dir"]+params["os_sep"]+file_tag, delimiter=params["delimiters"][i], index_col=False))
+
+    if params["datatype"] == "control":
+        for hg_build in params["ptc_mode"]:
+            if params["ptc_mode"][hg_build] == "absolute":
+                print("< absolute mode not working for control dataset. set to 'relative'.")
+                params["ptc_mode"][hg_build] = "relative"
 
     # apply filtering steps to MSKCC dataset
     if params["datatype"] == "mskcc":
@@ -128,8 +141,6 @@ def main():
 
         data[0] = data[0][~data[0]["Protein_position"].isna()]
         if params["output_type"] != "analytical": data[0].dropna(subset=["NMD score"], inplace=True)
-        # marked (<-) removed on 250424 and shifted to get_tcga_selection (for consistency with other data types)
-        # data[0] = data[0].sort_values(by=["variant_id"]) # <- removed
 
         # if no label is passed, create placeholders
         if "NMD score" not in data[0].columns:
@@ -138,9 +149,11 @@ def main():
 
 
     # create a list of non-redundant variant ids
-    if params["datatype"] == "mskcc": selection = get_mskcc_selection(data[0], params)
-    if params["datatype"] == "tcga":  selection = get_tcga_selection(data[0], params)
-    if params["datatype"] == "teran": selection = get_teran_selection(data[0], params)
+    # marked (<-) newly added on 251027 to integrate control data
+    if params["datatype"] == "control": selection = get_control_selection(data[0], params)
+    if params["datatype"] == "mskcc":   selection = get_mskcc_selection(data[0], params)
+    if params["datatype"] == "tcga":    selection = get_tcga_selection(data[0], params)
+    if params["datatype"] == "teran":   selection = get_teran_selection(data[0], params)
     print("< selection created.")
 
 
@@ -156,11 +169,11 @@ def main():
 
         if hg_build == "hg19":
             hg_build_dir    = "hg19"
-            knowngene_fname = "hg19_knownGene.txt"
+            knowngene_fname = "hg19_knownGene_appended.txt"
 
         if hg_build == "hg38":
             hg_build_dir    = "hg38.p14"
-            knowngene_fname = "hg38_knownGene.txt"
+            knowngene_fname = "hg38_knownGene_appended.txt"
 
 
         # load genome
@@ -184,7 +197,7 @@ def main():
         
         if params["mapping_target"][hg_build] == "transcript id":
             knowngene["transcript id"] = [knowngene.iloc[i].loc["transcript id"].split(".")[0] for i in range(knowngene.shape[0])]
-            ucids                      = append_df_with_mapping2([selection, knowngene], "ID:transcript id", "transcript id", "uc id", verbose=False)
+            ucids                      = append_df_with_mapping2([selection, knowngene], "ID:transcript id", "transcript id", "uc id", verbose=True)
             selection["uc id"]         = ucids
 
         # fill dataframe
@@ -199,7 +212,6 @@ def main():
 
     # remove temporary index, rename additional features
     selection = selection.drop(["success", "uc id"], axis=1)
-    
     selection.to_csv(path_or_buf=params["data_dir"]+params["os_sep"]+params["outfname"] + ".txt", sep=",", index=False)
     print("< file printed.")
 
@@ -207,12 +219,14 @@ def main():
     #create cohort file if cohort list was loaded
     if len(data) == 1 and params["randomize"] == True:
         selection = get_random_cohorts(selection, params["cohorts"])
-        selection.to_csv(path_or_buf=params["data_dir"]+params["os_sep"]+params["outfname"]+"_N" + str(params["cohorts"]) + ".txt", sep=",", index=False)
+        selection.to_csv(path_or_buf=params["data_dir"]+params["os_sep"]+params["outfname"]+"_N" + str(params["cohorts"]) + ".txt",
+                         sep=",", index=False)
 
     if len(data) == 2:
         selection = append_lindeboom_predictions(selection, data[1])
         if params["randomize"] == True: selection = get_random_cohorts(selection, params["cohorts"])
-        selection.to_csv(path_or_buf=params["data_dir"]+params["os_sep"]+params["outfname"]+"_lindeboom_N" + str(params["cohorts"]) + ".txt", sep=",", index=False)
+        selection.to_csv(path_or_buf=params["data_dir"]+params["os_sep"]+params["outfname"]+"_lindeboom_N" + str(params["cohorts"]) + ".txt",
+                         sep=",", index=False)
 
     # store parameters of current session
     params_fname = params["outfname"] + "_params.json"

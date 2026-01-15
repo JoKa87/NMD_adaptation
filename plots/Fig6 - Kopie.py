@@ -126,13 +126,67 @@ def main():
             "separators": [",", ","],
             "target_col": "total",
             "type"      : "kaplan_meier"
+            },
+            {
+            "data"      : [],
+            "datatype"  : ["pandas"],
+            "extensions": [None, None],
+            "features"  : {
+                           "density"            : True,
+                           "labels"             : ["PTC mutations"],
+                           "line"               : [{20: "black"}],
+                           "xcol"               : [[None]],
+                           "xlabel"             : "PTC mutations",
+                           "x_mute"             : False,
+                           "xrange"             : (0, 200),
+                           "ylabel"             : "rel. counts"
+                        },
+            "paths"     : [parent_dir+r"\data\msk_chord_variants.txt"],
+            "separators": [","],
+            "target_col1": {"ID:cancer type": "Colorectal Cancer"},
+            "target_col2": "FEATURE:ptc_mutations",
+            "type"      : "step_histogram2"
+            },
+            {
+            "data"      : [],
+            "datatype"  : ["json"],
+            "extensions": [None],
+            "features"  : {
+                           "density"            : True,
+                           "labels"             : ["NMD susceptibilities of expected PTCs", "NMD susceptibilities of observed PTCs"],
+                           "xcol"               : [["values"], ["FEATURE:prediction_values"]],
+                           "xlabel"             : "NMD susceptibility",
+                           "x_mute"             : False,
+                           "xrange"             : (0.5, 0.8),
+                           "ylabel"             : "rel. counts"
+                        },
+            "paths"     : [parent_dir+r"\data\prediction_analysis_msk\2025-07-10_10-27-29_msk_colorectal_low_ptc\msk_colorectal_low_ptc_stats.json"],
+            "separators": [","],
+            "type"      : "step_histogram"
+            },
+            {
+            "data"      : [],
+            "datatype"  : ["json"],
+            "extensions": [None],
+            "features"  : {
+                           "density"            : True,
+                           "labels"             : ["NMD susceptibilities of expected PTCs", "NMD susceptibilities of observed PTCs"],
+                           "xcol"               : [["values"], ["FEATURE:prediction_values"]],
+                           "xlabel"             : "NMD susceptibility",
+                           "x_mute"             : False,
+                           "xrange"             : (0.5, 0.8),
+                           "ylabel"             : "rel. counts"
+                        },
+            "paths"     : [parent_dir+r"\data\prediction_analysis_msk\2025-07-10_10-49-34_msk_colorectal_high_ptc\msk_colorectal_high_ptc_stats.json"],
+            "separators": [","],
+            "type"      : "step_histogram"
             }
         ]
 
-    dims       = (3, 4)
-    resolution = 600
-    run_dir    = parent_dir+r"\data\figures"
-    data       = [data[i] for i in range(len(data)) if "off" not in data[i] or data[i]["off"] == False]
+    dims           = (4, 4)
+    resolution     = 600
+    run_dir        = parent_dir+r"\data\figures"
+    data = [data[i] for i in range(len(data)) if "off" not in data[i] or data[i]["off"] == False]
 
 
     pu = Plot_utils()
@@ -145,12 +199,15 @@ def main():
     gs = fig.add_gridspec(dims[0], 3*dims[1])
 
     subplots = []
-
-    for i in range(2):
-        subplots.append(fig.add_subplot(gs[i, 0:4]))
-        subplots.append(fig.add_subplot(gs[i, 4:8]))
-        subplots.append(fig.add_subplot(gs[i, 8:12]))
-
+    subplots.append(fig.add_subplot(gs[0, 0:4]))
+    subplots.append(fig.add_subplot(gs[0, 4:8]))
+    subplots.append(fig.add_subplot(gs[0, 8:12]))
+    subplots.append(fig.add_subplot(gs[1, 0:4]))
+    subplots.append(fig.add_subplot(gs[1, 4:8]))
+    subplots.append(fig.add_subplot(gs[1, 8:12]))
+    subplots.append(fig.add_subplot(gs[2, 0:4]))
+    subplots.append(fig.add_subplot(gs[2, 4:8]))
+    subplots.append(fig.add_subplot(gs[2, 8:12]))
 
     pvalues = {"cancer type": [], "pvalue": [], "counts1": [], "counts2": []}
 
@@ -175,18 +232,30 @@ def main():
             subplots[i] = pu.plot_kaplan_meier(subplots[i], [selected_data1, selected_data2], data[i]["features"], pvalue=pvalue)
 
 
+        if data[i]["type"] == "step_histogram":
+            subplots[i] = pu.plot_step_histogram(subplots[i], data[i]["data"], data[i]["features"])
+
+
+        if data[i]["type"] == "step_histogram2":
+            target_col                  = list(data[i]["target_col1"].keys())[0]
+            data[i]["data"][0]          = data[i]["data"][0][data[i]["data"][0][target_col] == data[i]["target_col1"][target_col]]
+            data[i]["features"]["xcol"] = [[data[i]["target_col2"]]]
+            subplots[i] = pu.plot_step_histogram(subplots[i], data[i]["data"], data[i]["features"])
+
+
         subplots[i].text(-0.1, 1.1, string.ascii_lowercase[i], transform=subplots[i].transAxes, size=9, weight='bold')
 
     pvalues["pvalue"] = [*sm.stats.fdrcorrection(pvalues["pvalue"][0:len(pvalues["pvalue"])-1], alpha=0.05)[1], pvalues["pvalue"][len(pvalues["pvalue"])-1]]
+    print("< FDR-corrected pvalues")
     print(pd.DataFrame(pvalues))
 
-    if np.sum(pvalues["counts1"][0:len(pvalues["counts1"])-1])+np.sum(pvalues["counts2"][0:len(pvalues["counts2"])-1]) != pvalues["counts1"][-1]+pvalues["counts2"][-1]:
+    if np.sum(pvalues["counts1"][0:len(pvalues)-1]) != pvalues["counts1"][-1] or np.sum(pvalues["counts2"][0:len(pvalues)-1]) != pvalues["counts2"][-1]:
         print("< dimension error occurred.")
-        print(np.sum(pvalues["counts1"][0:len(pvalues["counts1"])-1])+np.sum(pvalues["counts2"][0:len(pvalues["counts2"])-1]), "/", pvalues["counts1"][-1]+pvalues["counts2"][-1])
 
     plt.show()
 
-    fig.savefig(run_dir + "\\Fig6_multistats.svg", dpi=resolution, transparent=True)
+    fig.savefig(run_dir + "\\Fig6.svg", dpi=resolution, transparent=True)
+    return
 
 
 if __name__ == '__main__':

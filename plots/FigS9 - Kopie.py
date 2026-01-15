@@ -8,6 +8,9 @@ parent_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
 
 
 def main():
+    boxplot_colors = []
+    [boxplot_colors.extend(["crimson", "royalblue"]) for _ in range(34)]
+
     # params #
     data = [
             {
@@ -25,17 +28,18 @@ def main():
                                "ymute"        : False,
                                },
             "off"            : False,
-            "paths"          : [[parent_dir+r"\data\prediction_analysis_tcga\2025-07-10_13-28-51_tcga_projectwise\2025-10-27_14-59-54_binomial"],
-                                [parent_dir+r"\data\prediction_analysis_tcga\2025-07-10_11-04-37_tcga\2025-10-21_17-38-31_binomial\selection_stats.txt"]],
+            "paths"          : [[parent_dir+r"\data\prediction_analysis_msk\2025-07-10_10-21-58_msk_projectwise\2025-07-10_15-50-24_binomial"],
+                                [parent_dir+r"\data\prediction_analysis_msk\2025-07-10_10-21-27_msk\2025-07-10_15-46-32_binomial\selection_stats.txt"]],
             "separators"     : [",", ","],
             "target_col"     : "binomial-statistic FEATURE:prediction",
             "type"           : "matrix"
             },
         ]
 
-    dims       = (14, 2)
+    dims       = (7, 4)
     resolution = 600
     run_dir    = parent_dir+r"\data\figures"
+
 
     pu = Plot_utils()
 
@@ -43,14 +47,16 @@ def main():
     data = load(data)
 
     # define figure
-    fig = plt.figure(figsize=(180/25.4, 240/25.4), constrained_layout=True)
-    gs = fig.add_gridspec(dims[0], 3*dims[1])
+    fig = plt.figure(figsize=(180/25.4, 180/25.4), constrained_layout=True)
+    gs = fig.add_gridspec(dims[0], 3*dims[1]+1)
 
     subplots = []
-    for i in range(2):
-        subplots.append(fig.add_subplot(gs[7*i:7*(i+1), 0:2]))
-        subplots.append(fig.add_subplot(gs[7*i:7*(i+1), 2:4]))
-        subplots.append(fig.add_subplot(gs[7*i:7*(i+1), 4:6]))
+    subplots.append(fig.add_subplot(gs[0:7, 0:2]))
+    subplots.append(fig.add_subplot(gs[0:7, 2:4]))
+    subplots.append(fig.add_subplot(gs[0:7, 4:6]))
+    subplots.append(fig.add_subplot(gs[7:, 0:2]))
+    subplots.append(fig.add_subplot(gs[7:, 2:4]))
+    subplots.append(fig.add_subplot(gs[7:, 4:6]))
 
     for i in range(len(data)):
         if data[i]["type"] == "matrix":
@@ -73,9 +79,9 @@ def main():
                         # avoid duplicates (can occur for gene symbols)
                         if project+"_"+data[i]["data"][j].iloc[k].loc["block id"] not in assembled_data.index:
                             current_data = pd.DataFrame({"project":                        [project],
-                                                        "gene symbol":                     [data[i]["data"][j].iloc[k].loc["block id"]],
-                                                        data[i]["target_col"]:             [data[i]["data"][j].iloc[k].loc[data[i]["target_col"]]]},
-                                                        index=[project+"_"+data[i]["data"][j].iloc[k].loc["block id"]])
+                                                         "gene symbol":                     [data[i]["data"][j].iloc[k].loc["block id"]],
+                                                         data[i]["target_col"]:             [data[i]["data"][j].iloc[k].loc[data[i]["target_col"]]]},
+                                                         index=[project+"_"+data[i]["data"][j].iloc[k].loc["block id"]])
 
                             if assembled_data.shape[0] > 0: assembled_data = pd.concat([assembled_data, current_data])
                             else:                           assembled_data = current_data
@@ -94,15 +100,13 @@ def main():
                     and len([rearranged_data.loc[j].loc[col] for col in rearranged_data.columns if rearranged_data.loc[j].loc[col] > 0])):
                     print("< ambiguous trend:", j)
 
-            # hacky solution to split figure in half (with new evaluation, too many genes for a single figure)
-            rearranged_data = rearranged_data.iloc[rearranged_data.index.tolist().index("MLH3")+3:] 
             index = split_index(rearranged_data.shape[0], len(subplots))
 
             for k in range(len(index)):
                 subplots[i+k] = pu.plot_matrix(subplots[i+k], rearranged_data.iloc[index[k][0]:index[k][1]], data[i]["features"])
-
+                
     plt.show()
-    fig.savefig(run_dir + "\\FigS7b.svg", dpi=resolution, transparent=True)
+    fig.savefig(run_dir + "\\FigS9.svg", dpi=resolution, transparent=True)
 
 
 if __name__ == '__main__':

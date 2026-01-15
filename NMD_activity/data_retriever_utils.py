@@ -109,6 +109,7 @@ class Data_retriever_utils():
                     for appending_target in self.params["appending_targets"]:
                         status["file_ids"][project][case_id][appending_category+"_"+appending_target] = updated_targets[appending_target]
 
+                #print(json.dumps(status["file_ids"][project][case_id], indent=4))
                 bar.next()
         bar.finish()
 
@@ -194,6 +195,7 @@ class Data_retriever_utils():
 
         fields = [
         "analysis.input_files.experimental_strategy",
+        #"cases.case_id",
         "downstream_analyses.output_files.access",
         "downstream_analyses.output_files.data_type",
         "downstream_analyses.output_files.experimental_strategy",
@@ -201,7 +203,11 @@ class Data_retriever_utils():
         "downstream_analyses.output_files.md5sum",
         "downstream_analyses.workflow_type",
         "cases.samples.sample_type",
+        #"cases.samples.tumor_code",
+        #"cases.samples.tumor_code_id",
+        #"cases.project.primary_site",
         "file_id",
+        #"submitter_id"
         ]
 
         fields = ",".join(fields)
@@ -249,10 +255,11 @@ class Data_retriever_utils():
             if len(targets[case]["RNA"]) > 0 and len(targets[case]["WXS"]) > 0:
                 for key in targets[case]:
                     for j in range(len(targets[case][key])):
+                        #print(sub_dir+"\\"+key+"\\"+str(targets[case][key][j]), os.path.isfile(sub_dir+"\\"+key+"\\"+str(targets[case][key][j])))
                         if os.path.isfile(sub_dir+"\\"+key+"\\"+str(targets[case][key][j])) == False and key != "CNV_genes" and "sample_type" not in key:
                             print(sub_dir+"\\"+key+"\\"+str(targets[case][key][j]))
                             data_endpt       = "https://api.gdc.cancer.gov/data/{}".format(targets[case][key][j])
-                            os.system("curl " + data_endpt + " -v")
+                            #os.system("curl " + data_endpt + " -v")
 
                             response         = requests.get(data_endpt, headers={"Content-Type": "application/json"}).content
                     
@@ -272,6 +279,8 @@ class Data_retriever_utils():
                             downloads += 1
             else:
                 self.log.write("< not all file types found for case " + json.dumps(targets[case]) + "\n")
+
+            #bar.next()
 
         return downloads
     
@@ -297,16 +306,18 @@ class Data_retriever_utils():
         cases = 0; files = 0
         for target in targets:
             if mode == "case_ids":
-                start          = 0
-                no_update      = False
+                start     = 0
+                no_update = False
                 while no_update == False:
                     response = self.case_request(start, target)                 
+                    #print(json.dumps(response, indent=4))
 
                     if "data" in response and "hits" in response["data"]:
                         for i in range(len(response["data"]["hits"])):   
                             if "files" in response["data"]["hits"][i]:
                                 cnv_found = False; rna_found = False; wxs_found = False
                                 for j in range(len(response["data"]["hits"][i]["files"])):
+                                    #print(j, response["data"]["hits"][i]["files"][j]["data_category"])
                                     if ("data_category" in response["data"]["hits"][i]["files"][j] 
                                         and response["data"]["hits"][i]["files"][j]["data_category"] == "Copy Number Variation"):
                                         cnv_found = True
@@ -325,24 +336,36 @@ class Data_retriever_utils():
                                 if "rna" in self.params["filter_criterion"] and rna_found == False: filter_passed = False
                                 if "wxs" in self.params["filter_criterion"] and wxs_found == False: filter_passed = False
 
+                                #print("i", i, response["data"]["hits"][i]["submitter_id"], cnv_found, rna_found, wxs_found, len(output[target]["case_id"]), filter_passed)
+
                                 if filter_passed == True and response["data"]["hits"][i]["case_id"] not in output[target]["case_id"]:
+                                #if (cnv_found == True and rna_found == True and wxs_found == True
+                                #    and response["data"]["hits"][i]["case_id"] not in output[target]["case_id"]):
                                     cases += 1
                                     output[target]["case_id"].append(response["data"]["hits"][i]["case_id"])
                                     output[target]["submitter_id"].append(response["data"]["hits"][i]["submitter_id"])
+                                    #for j in range(len(response["data"]["hits"][i]["samples"])):
+                                    #    output[target]["tumor_code"].append(response["data"]["hits"][i]["samples"][j]["tumor_code"])                    
+                                    #    output[target]["tumor_code_id"].append(response["data"]["hits"][i]["samples"][j]["tumor_code_id"])
 
                     else:
                         self.log.write("< error. 'data' or 'hits' keywords not found in" + json.dumps(response))
                         print("< error. 'data' or 'hits' keywords not found in", response)
 
+                    #print("start", start, "count", response["data"]["pagination"]["count"], "total", response["data"]["pagination"]["total"], "l", cases)
                     start += response["data"]["pagination"]["count"]
                     if start >= response["data"]["pagination"]["total"] or response["data"]["pagination"]["count"] == 0: no_update = True
+                    #input("x")
 
             elif mode == "file_ids":
+                #print(targets[target]["case_id"])
                 for case in targets[target]["case_id"]:
                     start          = 0
                     no_update      = False
                     while no_update == False:
                         response = self.file_request(start, case)
+                        #print(json.dumps(response, indent=4))
+                        print("case", case, len(response["data"]["hits"]))
                         cnv_sample_type = {"CNV_ranges_sample_type": {}, "CNV_genes_sample_type": {}}
 
                         if "data" in response and "hits" in response["data"]:
@@ -423,6 +446,7 @@ class Data_retriever_utils():
                             self.log.write(json.dumps(response, indent=4))
 
                         start += response["data"]["pagination"]["count"]
+                        print("start", start, "count", response["data"]["pagination"]["count"], "total", response["data"]["pagination"]["total"])
                         if start >= response["data"]["pagination"]["total"] or response["data"]["pagination"]["count"] == 0: no_update = True
                     
                     for key in cnv_sample_type:
@@ -444,7 +468,7 @@ class Data_retriever_utils():
                         if (response["data"]["summary"]["experimental_strategies"][k]["experimental_strategy"] == "WXS"
                             and response["data"]["summary"]["experimental_strategies"][k]["file_count"] > 0):
                             matches += 1
-
+                    #print(target, k, response["data"]["summary"]["experimental_strategies"][k]["experimental_strategy"], matches)
                 else:
                     self.log.write("< error. 'data' or 'summary' or 'experimental_strategies' keywords not found in" + str(response))
                     print("< error. 'data' or 'summary' or 'experimental_strategies' keywords not found in", response)
@@ -462,7 +486,6 @@ class Data_retriever_utils():
 
     def request_undefined(self, mode):
         output = []
-
         start          = 0
 
         failed_request = False
@@ -473,8 +496,9 @@ class Data_retriever_utils():
                     response = requests.get(self.params["url"]+"projects?from="+ str(start) + "&pretty=true").json()
 
                     for k in range(len(response["data"]["hits"])):
-                        if (self.params["project_filter"] in response["data"]["hits"][k]["id"]
-                        and (len(self.params["projects"]) == 0 or (len(self.params["projects"]) > 0 and response["data"]["hits"][k]["id"] in self.params["projects"]))): 
+                        #print(k, response["data"]["hits"][k]["id"])
+                        if (self.params["project_filter"] == None or (self.params["project_filter"] in response["data"]["hits"][k]["id"]
+                        and (len(self.params["projects"]) == 0 or (len(self.params["projects"]) > 0 and response["data"]["hits"][k]["id"] in self.params["projects"])))): # <- modified on 251025 
                             output.append(response["data"]["hits"][k]["id"])
 
                 start += response["data"]["pagination"]["count"]

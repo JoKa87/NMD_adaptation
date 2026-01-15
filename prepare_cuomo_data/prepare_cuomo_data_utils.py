@@ -45,12 +45,12 @@ class Prepare_cuomo_data_utils:
 
         if self.params["hg_build"] == "hg19":
             hg_build_dir    = "hg19"
-            knowngene_fname = "hg19_knownGene.txt"
+            knowngene_fname = "hg19_knownGene_appended.txt"
 
         # marked (<-) added on 250427 to allow integration of hg38 in combination with liftover
         if self.params["hg_build"] == "hg38": # <-
             hg_build_dir    = "hg38.p14" # <-
-            knowngene_fname = "hg38_knownGene.txt" # <-
+            knowngene_fname = "hg38_knownGene_appended.txt" # <-
 
 
         self.genome = load_split_genome(self.params["data_dir1"]+self.params["os_sep"]+hg_build_dir, os_sep=self.params["os_sep"])
@@ -60,7 +60,7 @@ class Prepare_cuomo_data_utils:
         self.known_gene = pd.read_csv(params["data_dir1"]+params["os_sep"]+knowngene_fname, delimiter=",", index_col=False)
         
         # create dictionary
-        # marked (<-) added / removed on 250427 to speed-up gene detection
+        # marked (<-) added / rmeoved on 250427 to speed-up gene detection
         # self.known_gene_dict = create_knowngene_dict_by_position(self.known_gene, stepsize=params["stepsize"]) # <- removed
         self.known_gene_dict = create_knowngene_dict_by_position(self.known_gene, redundant=True, stepsize=params["stepsize"]) # <- added
         print("< dictionary created")

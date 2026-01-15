@@ -15,8 +15,18 @@ from extract_mutations_utils import *
 from shared_utils import *
 
 
-chrs = {"1": 0, "2": 1, "3": 2, "4": 3, "5": 4, "6": 5, "7": 6, "8": 7, "9": 8, "10": 9, "11": 10, "12": 11,
-        "13": 12, "14": 13, "15": 14, "16": 15, "17": 16, "18": 17, "19": 18, "20": 19, "21": 20, "22": 21, "X": 22, "Y": 23}
+bases          = ["A", "C", "G", "T"]
+chrs           = {"1": 0, "2": 1, "3": 2, "4": 3, "5": 4, "6": 5, "7": 6, "8": 7, "9": 8, "10": 9, "11": 10, "12": 11,
+                  "13": 12, "14": 13, "15": 14, "16": 15, "17": 16, "18": 17, "19": 18, "20": 19, "21": 20, "22": 21, "X": 22, "Y": 23}
+stop_codons    = ["TAA", "TAG", "TGA"]
+read_through_1 = []
+read_through_2 = []
+
+for stop_codon in stop_codons:
+    for base1 in bases:
+        read_through_1.append(stop_codon+base1)
+        for base2 in bases:
+            read_through_2.append(stop_codon+base1+base2)
 
 
 # append rna half-lifes: nar-00991-met-g-2009-File003.txt
@@ -96,8 +106,6 @@ def get_chr_id(path, with_modification=True):
 
 def invert(seq):
     inverse_seq = ""
-    #bases         = ["A", "C", "G", "T"]
-    #inverse_bases = ["T", "G", "C", "A"]
     bases         = ["A", "C", "G", "T", "N", "-"]
     inverse_bases = ["T", "G", "C", "A", "N", "-"]
     
@@ -173,7 +181,7 @@ def fill_error_report(error_report, selection, fails, strand, it):
     return error_report
 
 
-def get_info(df, variant_id, match_index, ptc_index, mutation_index, wt_base, cds_size, genome, params, ptc_mode="absolute"):
+def get_info(df, variant_id, match_index, ptc_index, mutation_index, wt_base, mutated_base, cds_size, genome, params, ptc_mode="absolute"):
     info  = {}
     fails = []
 
@@ -302,10 +310,7 @@ def get_info(df, variant_id, match_index, ptc_index, mutation_index, wt_base, cd
                         extracted_sequence.append({"info": "3'ptc", "sequence": genome[chr][ptc_index:exonsend[i]]})
 
                     except:
-                        print("error", chr, exon_cds_start, exon_cds_end, ptc_index)
-                        if chr in genome:
-                            print("chk")
-                        
+                        print("error", chr, exon_cds_start, exon_cds_end, ptc_index)                        
                         exit()
 
                 elif transcript.loc["strand"] == "-":
@@ -318,8 +323,6 @@ def get_info(df, variant_id, match_index, ptc_index, mutation_index, wt_base, cd
                     if show == True: print("i8", i, "ptc-up", info["FEATURE:ptc upstream distance"], "ptc-down", info["FEATURE:ptc downstream distance"])
                     extracted_sequence.append({"info": "ptc cds", "sequence": invert(genome[chr][exon_cds_start:exon_cds_end])})
                     extracted_sequence.append({"info": "ptc", "sequence": invert(genome[chr][exonsstart[i]:exonsend[i]])})
-                    #print("L", chr, type(genome[chr]))
-                    #print("L2", len(genome[chr]), ptc_index, exonsend[i])
                     extracted_sequence.append({"info": "5'ptc", "sequence": invert(genome[chr][ptc_index:exonsend[i]])})
                     extracted_sequence.append({"info": "3'ptc", "sequence": invert(genome[chr][exonsstart[i]:ptc_index])})
 
@@ -351,7 +354,7 @@ def get_info(df, variant_id, match_index, ptc_index, mutation_index, wt_base, cd
     # marked (<-) added on 250425 to account for cds exons only
     info["FEATURE:upstream cds exons"] = info["FEATURE:cds exons"]-info["FEATURE:downstream cds exons"] # <-
 
-    # marked (<-) added on 250425 to integrate additional features
+    # marked (<-) added on 250425 to integrate additional features motivated by Kim et al.
     if info["FEATURE:downstream exons"] == 1: # <-
         info["FEATURE:last exon"] = 1 # <-
 
@@ -473,11 +476,16 @@ def get_info(df, variant_id, match_index, ptc_index, mutation_index, wt_base, cd
     if type(info["FEATURE:ptc"]) == str and upstream_exon_size != None:
         info, fails = get_motif(info, fails, params, info["FEATURE:ptc"], "ptc exon", framestart=0, relative_ptc_index=ptc_exon_index-upstream_exon_size,
                                 selected_motifs=["GC"], variant_id=variant_id)
+ 
 
     if ptc_mode == "absolute": info["FEATURE:abs. ptc index"] = ptc_index
 
     if ptc_mode == "relative" and transcript.loc["strand"] == "-":
         wt_base = invert(wt_base)
+        if mutated_base != None: mutated_base = invert(mutated_base) # <- added on 260109 to calculate read-through stop codons
+       
+    # <- added on 260109 to include read-through info
+    info, fails = get_read_through_motif(info, fails, mutation_index, mutated_base, ptc_mode, variant_id)
 
     # added on 241126
     if len(wt_base) > 1: wt_base = wt_base[0]
@@ -598,11 +606,84 @@ def get_position_from_mutation(mutation_info):
     else:                  return int(position)
 
 
+# <- added on 260109 to include read-through info
+def get_read_through_motif(info, fails, mutation_index, mutated_base, ptc_mode, variant_id):
+    if ptc_mode == "absolute" and mutated_base == None:
+        info["FEATURE:read-through+1"] = None
+        info["FEATURE:read-through+2"] = None
+        
+    else:
+        # replace mutated base
+        cds = "".join(base if i != mutation_index else mutated_base for i, base in enumerate(info["FEATURE:all cds"]))
+
+        if cds[info["FEATURE:ptc cds position"]-2:info["FEATURE:ptc cds position"]+1] not in stop_codons:
+            print("< error @get_read_through_motif. stop codon not detected for variant id:", variant_id)
+            print(" context:", cds[info["FEATURE:ptc cds position"]-3:info["FEATURE:ptc cds position"]+3], "/",
+                               info["FEATURE:all cds"][info["FEATURE:ptc cds position"]-3:info["FEATURE:ptc cds position"]+3])
+            info["FEATURE:read-through+1"] = None
+            info["FEATURE:read-through+2"] = None
+            fails.append("mutated_stop_codon_not_found")
+            
+        else:
+            info["FEATURE:read-through+1"] = read_through_1.index(cds[info["FEATURE:ptc cds position"]-2:info["FEATURE:ptc cds position"]+2])
+            info["FEATURE:read-through+2"] = read_through_2.index(cds[info["FEATURE:ptc cds position"]-2:info["FEATURE:ptc cds position"]+3])
+    
+    return info, fails
+
+
+# <- added on 251027 averaging of scores not supported
+def get_control_selection(df, params):
+    selection_df = {"ID:sample id": [], "ID:strand": [], "ID:chromosome": [], "ID:gene symbol": [],"ID:transcript id": [],
+                    "ID:variant id": [], "ID:HGVSc": [], "ID:HGVSp": [], "ID:variant classification": [],
+                    "ID:abs. mutation index": [], "ID:cds size": [], "ID:mutation index": [], "ID:wt base": [], "ID:ptc index": [],
+                    "ID:wt expression": [], "ID:wt expression, direct avg": [], "ID:allelic fraction": [], "ID:base mean": [],
+                    "LABEL:NMD score": [], "LABEL:NMD score padj": []}
+    
+    bar = IncrementalBar(set_bar("selecting control data"), max=df.shape[0])
+    for i in range(df.shape[0]):
+        selection_df["ID:sample id"].append(df.iloc[i].loc["SAMPLE_ID"])
+        selection_df["ID:chromosome"].append(df.iloc[i].loc["Chromosome"])
+        selection_df["ID:strand"].append(df.iloc[i].loc["Strand"])
+        selection_df["ID:gene symbol"].append(df.iloc[i].loc["Gene_Hugo"])
+        selection_df["ID:transcript id"].append(df.iloc[i].loc["Ensembl_transcript_id"].split(".")[0])
+        selection_df["ID:variant id"].append(df.iloc[i].loc["Ensembl_transcript_id"].split(".")[0]+"_"+str(df.iloc[i].loc["Start"])+"_"+str(df.iloc[i].loc["End"]))
+        selection_df["ID:variant classification"].append(df.iloc[i].loc["Type_1"]) # <- added on 251027
+
+        selection_df["ID:abs. mutation index"].append(df.iloc[i].loc["Start"]-1)
+
+        selection_df["ID:HGVSc"].append(df.iloc[i].loc["Change_cDNA"])
+        selection_df["ID:HGVSp"].append(df.iloc[i].loc["Change_Protein"])
+
+        selection_df["ID:mutation index"].append(get_numbers(df.iloc[i].loc["Change_cDNA"])[0]-1)
+        selection_df["ID:wt base"].append(df.iloc[i].loc["Wild_Type"])
+
+        # required as placeholder
+        selection_df["ID:cds size"].append(None)
+        selection_df["ID:ptc index"].append(df.iloc[i].loc["ptc index"])
+        selection_df["ID:base mean"].append(df.iloc[i].loc["baseMean"])
+        selection_df["ID:wt expression"].append(df.iloc[i].loc["wt expression"])
+        selection_df["ID:wt expression, direct avg"].append(df.iloc[i].loc["wt expression, direct avg"])
+        selection_df["ID:allelic fraction"].append(df.iloc[i].loc["Allelic_Fraction_Tumor"])
+        selection_df["LABEL:NMD score"].append(df.iloc[i].loc["log2FoldChange"])
+        selection_df["LABEL:NMD score padj"].append(df.iloc[i].loc["padj"])
+        bar.next()
+    bar.finish()
+    
+    selection  = pd.DataFrame.from_dict(selection_df)
+    init_shape = selection.shape[0]
+    selection  = selection[~selection["ID:ptc index"].isna()]
+    print("< removal of missing ptc index reduced values from", init_shape, "to", selection.shape[0])
+    # index needs to be changed to int, else causing downstream error @get_info
+    selection = selection.astype({"ID:mutation index": "int32", "ID:ptc index": "int32"})
+    return selection
+
+
 # averaging of scores not supported
 def get_mskcc_selection(df, params):
     bar = IncrementalBar(set_bar("selecting MSKCC data"), max=df.shape[0])
-    selection_df = {"ID:entrez gene id": [], "ID:gene symbol": [], "ID:patient id": [], "ID:sample id": [], "ID:transcript id": [], "ID:variant id": [],
-                    "ID:chromosome": [], "ID:HGVSc": [], "ID:HGVSp": [],
+    selection_df = {"ID:entrez gene id": [], "ID:gene symbol": [], "ID:patient id": [], "ID:sample id": [], "ID:transcript id": [],
+                    "ID:variant id": [], "ID:chromosome": [], "ID:HGVSc": [], "ID:HGVSp": [],
+                    "ID:variant classification": [], # <- added on 251027
                     "ID:abs. mutation index": [], "ID:cds size": [], "ID:mutation index": [], "ID:wt base": [], "ID:ptc index": [],
                     "ID:cds size": []}
      
@@ -620,6 +701,7 @@ def get_mskcc_selection(df, params):
                 selection_df["ID:sample id"].append(df.iloc[i].loc["Tumor_Sample_Barcode"])
                 selection_df["ID:transcript id"].append(df.iloc[i].loc["Transcript_ID"])
                 selection_df["ID:variant id"].append(df.iloc[i].loc["Transcript_ID"]+"_"+str(df.iloc[i].loc["Start_Position"])+"_"+str(df.iloc[i].loc["End_Position"]))
+                selection_df["ID:variant classification"].append(df.iloc[i].loc["Variant_Classification"]) # <- added on 251027
 
                 selection_df["ID:abs. mutation index"].append(df.iloc[i].loc["Start_Position"]-1)
                 selection_df["ID:chromosome"].append("chr"+df.iloc[i].loc["Chromosome"])
@@ -636,7 +718,9 @@ def get_mskcc_selection(df, params):
                 # changed on 241112
                 ptc = get_ptc(df.iloc[i].loc["HGVSp"])
 
-                if ptc != None:
+                # <- added / removed on 251027 to exclude HGVSp with '?'
+                # if ptc != None: # <- removed
+                if ptc != None and get_frameshift(df.iloc[i].loc["HGVSp"]) != None: # <- added
                     # marked (<-) added / replaced on 250425 to calculate with shifted relative PTC index (+2) to avoid assignment to wrong exons of full stop codon
                     # selection_df["ID:ptc index"].append(3*(ptc-1)) # <- replaced
                     selection_df["ID:ptc index"].append(3*(ptc-1)+2) # <- added
@@ -644,6 +728,7 @@ def get_mskcc_selection(df, params):
                 else:
                     selection_df["ID:ptc index"].append(None)    
                     removed_ptcs.append(df.iloc[i].loc["HGVSp"])
+                    print("removed", df.iloc[i].loc["HGVSp"])
 
 
         bar.next()
@@ -802,12 +887,11 @@ def get_tcga_selection(df, params):
 
 
 def get_teran_selection(df, params):
-    # marked (<-) added on 250424 (for consistency with other data types, probably not required as data are already sorted)
-    df = df.sort_values(by=["VARIANT_ID"]) # <- added
+    df = df.sort_values(by=["VARIANT_ID"])
     
     selection_df = {"ID:variant id": [], "ID:alt. variant id": [], "ID:gene id": [], "ID:gene symbol": [], "ID:sample id": [], "ID:subject id": [], "ID:tissue id": [], "ID:transcript id": [],
                     "ID:chromosome": [], "ID:abs. mutation index": [], "ID:cds size": [], "ID:mutation index": [], "ID:ptc index": [], "ID:wt base": [],
-                    "ID:mutated base": [], # added on 250410 to allow gnomadDB request 
+                    "ID:mutated base": [],
                     "ID:aggregated variants": [], "LABEL:NMD score": []}
         
     alt_counts     = []
@@ -849,17 +933,8 @@ def get_teran_selection(df, params):
                     selection_df["ID:cds size"].append(3*df.iloc[index].loc["Protein_length"])
                     selection_df["ID:abs. mutation index"].append(df.iloc[index].loc["POS"]-1)
                     selection_df["ID:mutation index"].append(df.iloc[index].loc["CDS_position_only"]-1)
-                    # marked (<-) added / replaced on 250425 to calculate with shifted relative PTC index (+2) to avoid assignment to wrong exons of full stop codon
-                    # selection_df["ID:ptc index"].append(3*int((df.iloc[index].loc["CDS_position_only"]-1)/3)) # <- replaced
                     selection_df["ID:ptc index"].append(3*int((df.iloc[index].loc["CDS_position_only"]-1)/3)+2) # <- added
-
-                    # marked (<-) removed on 250425 as error-prone due to ignoring of triplett split over two exons
-                    # if df.iloc[index].loc["STRAND"] == 1:  frameshift_correction = (3*int((df.iloc[index].loc["CDS_position_only"]-1)/3))-(df.iloc[index].loc["CDS_position_only"]-1) # <- removed
-                    # if df.iloc[index].loc["STRAND"] == -1: frameshift_correction = (df.iloc[index].loc["CDS_position_only"]-1)-(3*int((df.iloc[index].loc["CDS_position_only"]-1)/3)) # <- removed
-                    # selection_df["ID:abs. ptc index"].append((df.iloc[index].loc["POS"]-1)+frameshift_correction) # <- removed
-
                     selection_df["ID:wt base"].append(df.iloc[index].loc["REF_ALLELE"])
-                    # marked (<-) added on 250410 to allow gnomadDB request
                     selection_df["ID:mutated base"].append(df.iloc[index].loc["ALT_ALLELE"]) # <-
                     selection_df["LABEL:NMD score"].append(label)
                                              		
@@ -919,12 +994,9 @@ def _fill_df(selection, thread_index, genome, knowngene, knowngene_dict, params,
         ptc_identifier      = "ID:ptc index"
     
     # initialize error report
-    #error_report = {key: {error: [] for error in [*params["error_handling"], "no_error"]} 
-    #                for key in ["+del1", "+delins1", "+dup1", "+ins1", "+nonsense", "-del1", "-delins1", "-dup1", "-ins1", "-nonsense",
-    #                            "+del>1", "+delins>1", "+dup>1", "+ins>1", "-del>1", "-delins>1", "-dup>1", "-ins>1", "total"]} # <- removed on 250616
     error_report = {key: {error: [] for error in [*params["error_handling"], "no_error"]} 
                     for key in ["+del1", "+delins1", "+dup1", "+ins1", "+nonsense", "-del1", "-delins1", "-dup1", "-ins1", "-nonsense",
-                                "+del>1", "+delins>1", "+dup>1", "+ins>1", "-del>1", "-delins>1", "-dup>1", "-ins>1", "total", "+total", "-total"]} # <- added on 250616
+                                "+del>1", "+delins>1", "+dup>1", "+ins>1", "-del>1", "-delins>1", "-dup>1", "-ins>1", "total", "+total", "-total"]}
     
     for i in range(thread_index[0], thread_index[1]+1, 1):
         if selection.iloc[i].loc["success"] == False and pd.isna(selection.iloc[i].loc[ptc_identifier]) == False and pd.isna(selection.iloc[i].loc[mutation_identifier]) == False:
@@ -940,8 +1012,11 @@ def _fill_df(selection, thread_index, genome, knowngene, knowngene_dict, params,
                 if mapping_target in knowngene_dict.keys():
                     j = knowngene_dict[mapping_target]
 
+                    if "ID:mutated base" in selection.columns: mutated_base = selection.iloc[i].loc["ID:mutated base"]
+                    else:                                      mutated_base = None
+
                     info, fails = get_info(knowngene, selection.iloc[i].loc[params["block_identifier"]], j, selection.iloc[i].loc[ptc_identifier],
-                                           selection.iloc[i].loc[mutation_identifier], selection.iloc[i].loc["ID:wt base"],
+                                           selection.iloc[i].loc[mutation_identifier], selection.iloc[i].loc["ID:wt base"], mutated_base,
                                            selection.iloc[i].loc["ID:cds size"], genome, params, ptc_mode=params["ptc_mode"][hg_build])
                         
                     appris_annotations.append(knowngene.iloc[j].loc["appris annotation"])
@@ -985,8 +1060,6 @@ def _fill_df(selection, thread_index, genome, knowngene, knowngene_dict, params,
                 # priority 3: priorities 1 and 2 do not apply but selection is unambiguous
                 if match_index == None and len(infos) == 1:
                     match_index = 0
-
-                #print(selection.iloc[i].loc["ID:variant id"], len(infos), match_index, principal_index)
 
                 if match_index != None:
                     selection.at[selection.index[i], "success"] = True

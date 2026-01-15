@@ -1,6 +1,9 @@
+import os
 from scipy.cluster.hierarchy import linkage
 import sys
-sys.path.insert(0, r"C:\Programming\Translational_genomics\NMD_analysis\shared")
+
+parent_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
+sys.path.insert(0, parent_dir+"\\shared")
 
 from shared_utils import *
 
@@ -16,7 +19,6 @@ def apply_grid(fig, grid, dims, g, margin):
         col = 0
         for i, slot in enumerate(slots):
             if type(slot[0]) == tuple:
-                #print(slot, "row", row, "col", col, int(g[0]*(slot[0][0]+row*margin[0])), int(g[0]*(slot[0][1]+row*margin[0])), int(g[1]*(slot[1][0]+col*margin[1])), int(g[1]*(slot[1][1]+col*margin[1])))
                 subplots.append(fig.add_subplot(gs[int(g[0]*(slot[0][0]+row*margin[0])):int(g[0]*(slot[0][1]+row*margin[0])),
                                                    int(g[1]*(slot[1][0]+col*margin[1])):int(g[1]*(slot[1][1]+col*margin[1]))]))
 
@@ -27,7 +29,6 @@ def apply_grid(fig, grid, dims, g, margin):
                     col += 1
 
             elif pd.isna(slot[0]) == False:
-                #print(slot, "row", row, "col", col, int(g[0]*(slot[0]+row*margin[0])), int(g[0]*(slot[0]+row*margin[0]+1)), int(g[1]*(slot[1]+col*margin[1])), int(g[1]*(slot[1]+col*margin[1]+1)))
                 subplots.append(fig.add_subplot(gs[int(g[0]*(slot[0]+row*margin[0])):int(g[0]*(slot[0]+row*margin[0]+1)),
                                                    int(g[1]*(slot[1]+col*margin[1])):int(g[1]*(slot[1]+col*margin[1]+1))]))
                 col += 1
@@ -113,8 +114,4 @@ def prepare_boxplot(data, features):
     updated_data["project"].append("all")
     updated_data["escape_values"].append(data[data[features["yselector"]] <= features["score_threshold"]["FEATURE:escape"][1]][features["ycol"]].tolist())
     updated_data["target_values"].append(data[data[features["yselector"]] >= features["score_threshold"]["FEATURE:target"][0]][features["ycol"]].tolist())
-    
-    #for i, project in enumerate(projects):
-    #    print(project, len(updated_data["escape_values"][i]), np.mean(updated_data["escape_values"][i]), len(updated_data["target_values"][i]), np.mean(updated_data["target_values"][i]))
-
     return pd.DataFrame(updated_data)

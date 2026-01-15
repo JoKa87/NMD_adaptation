@@ -1,5 +1,3 @@
-# marked (<-) added on 250427 to allow integration of allele frequency
-# from gnomad_db.database import gnomAD_DB # <- added
 import math
 import os
 import pandas as pd
@@ -21,35 +19,27 @@ class Create_genome_predictions():
         self.expressions           = None
         self.gene_identifier       = None
         self.genome                = None
-        #self.gnomad_db             = None
         self.knowngene             = None
         self.lindeboom_dictionary  = None
         self.models                = models
         self.params                = params
         self.pattern_cutoff        = 5
-        # marked (<-) added on 250428 (collection of extracted features)
-        self.selected_features = ["FEATURE:5'utr-size", "FEATURE:3'utr-size", "FEATURE:upstream cds exons", "FEATURE:downstream cds exons", "FEATURE:downstream exons",
-                                  "FEATURE:downstream EJC density", "FEATURE:cds EJC density", "FEATURE:downstream cds EJC density", "FEATURE:ptc downstream distance",
-                                  "FEATURE:dist. from last EJC", "FEATURE:ptc cds position", "FEATURE:ptc exon position", "FEATURE:ptc-wt stop codon distance",
-                                  "FEATURE:last cds exon", "FEATURE:50 nt to last cds EJC", "FEATURE:ptc exon size", "FEATURE:total GC count exons",
-                                  "FEATURE:downstream GC ptc count ptc exon", "FEATURE:lindeboom prediction", "FEATURE:mean expression", "FEATURE:median expression"] # <- added
-
-        # marked (<-) added on 250428 to allow flexible usage of params->default_values or params->values (see initialize)
-        self.values                = {} # <- added
+        self.selected_features     = ["FEATURE:5'utr-size", "FEATURE:3'utr-size", "FEATURE:upstream cds exons", "FEATURE:downstream cds exons", "FEATURE:downstream exons",
+                                      "FEATURE:downstream EJC density", "FEATURE:cds EJC density", "FEATURE:downstream cds EJC density", "FEATURE:ptc downstream distance",
+                                      "FEATURE:dist. from last EJC", "FEATURE:ptc cds position", "FEATURE:ptc exon position", "FEATURE:ptc-wt stop codon distance",
+                                      "FEATURE:last cds exon", "FEATURE:50 nt to last cds EJC", "FEATURE:ptc exon size", "FEATURE:total GC count exons",
+                                      "FEATURE:downstream GC ptc count ptc exon", "FEATURE:lindeboom prediction", "FEATURE:mean expression", "FEATURE:median expression"]
+        self.values                = {}
 
 
-    # marked (<-) added/replaced on 250427 to adapt to novel model with new features
     def extract_features(self, features, fails, it):
-        #transient_features   = {**{feature: 0 for feature in ["3'utr-size", "current exon size", "last ejc", "regular lindeboom", "total cds size", "total exon size"]},
-        #                        **{"lindeboom prediction": [], "ptc cds position": []}} # replaced
         transient_features   = {**{feature: 0 for feature in ["5'utr-size", "3'utr-size", "cds exon", "cds exons", "current exon size", "last ejc",
                                                               "regular lindeboom", "total cds size", "total exon size", "total lindeboom size", "last cds correction"]},
-                                **{"downstream cds EJC density": [], "lindeboom prediction": [], "ptc cds position": []}, # , "ptc abs. position": []
-                                **{"all exons": "", "all cds": ""}} # <- added
+                                **{"downstream cds EJC density": [], "lindeboom prediction": [], "ptc cds position": []},
+                                **{"all exons": "", "all cds": ""}}
         init_size            = len(features["FEATURE:dist. from last EJC"])
 
         transcript           = self.knowngene.iloc[it]
-        #transcript_id        = transcript.loc["transcript id"].split(".")[0]
         transcript_id        = transcript.loc[self.gene_identifier].split(".")[0]
         fails[transcript_id] = {"cds_mismatch": 0, "chromosome_not_found": 0, "last_ejc_unknown": 0, "lindeboom_cds_size_error": 0, "lindeboom_exon_index_error": 0, "lindeboom_exon_size_error": 0,
                                 "lindeboom_not_found": 0, "lindeboom_size_test_error": 0, "total_exon_size_unknown": 0}
@@ -77,23 +67,23 @@ class Create_genome_predictions():
             else:                            fails[transcript_id]["last_ejc_unknown"] += 1
             i = transcript.loc["exons"]-1
 
-        # determine number of exons (<- added)
+        # determine number of exons
         transient_features["cds exons"] = len([i for i in range(len(exonsstart))
-                                               if not (exonsend[i] < transcript.loc["cdsstart"] or exonsstart[i] > transcript.loc["cdsend"])]) # <- added
+                                               if not (exonsend[i] < transcript.loc["cdsstart"] or exonsstart[i] > transcript.loc["cdsend"])])
 
         # determine lindeboom size for later testing
-        if transcript.loc["uc id"].split(".")[0] in self.lindeboom_dictionary.keys(): # <- added
+        if transcript.loc["uc id"].split(".")[0] in self.lindeboom_dictionary.keys():
 	        transient_features["total lindeboom size"] = np.sum([len(self.lindeboom_dictionary[transcript.loc["uc id"].split(".")[0]][i]["scores"])
-                                                                 for i in range(len(self.lindeboom_dictionary[transcript.loc["uc id"].split(".")[0]]))]) # <- added
+                                                                 for i in range(len(self.lindeboom_dictionary[transcript.loc["uc id"].split(".")[0]]))])
         
         cds_index = None
         cds_start = False
-        show = False
+        show = True
         while ((transcript.loc["strand"] == "+" and i < transcript.loc["exons"]) or (transcript.loc["strand"] == "-" and i >= 0)):
             if show == True: print("i", i, "exons", exonsstart[i], "/", exonsend[i], "cds", transcript.loc["cdsstart"], "/", transcript.loc["cdsend"])
 
-            if transcript.loc["strand"] == "+":   transient_features["all exons"] += self.genome[chr][exonsstart[i]:exonsend[i]] # <- added
-            elif transcript.loc["strand"] == "-": transient_features["all exons"] += self.invert(self.genome[chr][exonsstart[i]:exonsend[i]]) # <- added
+            if transcript.loc["strand"] == "+":   transient_features["all exons"] += self.genome[chr][exonsstart[i]:exonsend[i]]
+            elif transcript.loc["strand"] == "-": transient_features["all exons"] += self.invert(self.genome[chr][exonsstart[i]:exonsend[i]])
 
             # calculations for exons with no CDS (UTR-only)
             if exonsend[i] < transcript.loc["cdsstart"] or exonsstart[i] > transcript.loc["cdsend"]:
@@ -103,8 +93,8 @@ class Create_genome_predictions():
                     if show == True: print("3'UTR", transient_features["3'utr-size"])
 
                 else: # <- added
-                    transient_features["5'utr-size"] += exonsend[i]-exonsstart[i] # <- added
-                    if show == True: print("5'UTR", transient_features["5'utr-size"]) # <- added
+                    transient_features["5'utr-size"] += exonsend[i]-exonsstart[i]
+                    if show == True: print("5'UTR", transient_features["5'utr-size"])
 
             # calculations for exons with CDS
             else:
@@ -123,7 +113,7 @@ class Create_genome_predictions():
                 if exonsend[i] > transcript.loc["cdsend"]:     exon_cds_end   = transcript.loc["cdsend"]
                 else:                                          exon_cds_end   = exonsend[i]
 
-                if transcript.loc["strand"] == "+":   transient_features["all cds"] += self.genome[chr][exon_cds_start:exon_cds_end] # <- added
+                if transcript.loc["strand"] == "+":   transient_features["all cds"] += self.genome[chr][exon_cds_start:exon_cds_end]
                 elif transcript.loc["strand"] == "-": transient_features["all cds"] += self.invert(self.genome[chr][exon_cds_start:exon_cds_end]) # <- added
                 if show == True: print("CDS", exon_cds_start, exon_cds_end, exon_cds_end-exon_cds_start)
 
@@ -135,8 +125,8 @@ class Create_genome_predictions():
                     if transcript.loc["cdsstart"] >= exonsstart[i]: is_last_cds_exon = True
 
                 # introduced in order to take care of a few genes in which stop codon is distributed over two exons
-                if is_last_cds_exon == True and exon_cds_end-exon_cds_start < 3: # <- added
-                    transient_features["last cds correction"] = 3-(exon_cds_end-exon_cds_start) # <- added
+                if is_last_cds_exon == True and exon_cds_end-exon_cds_start < 3:
+                    transient_features["last cds correction"] = 3-(exon_cds_end-exon_cds_start)
 
                 
                 if show == True: print("cds", exon_cds_start, "/", exon_cds_end)
@@ -172,7 +162,6 @@ class Create_genome_predictions():
                         features["FEATURE:upstream cds exons"].append(transient_features["cds exon"])
                         features["FEATURE:downstream cds exons"].append(transient_features["cds exons"]-transient_features["cds exon"])
                         transient_features["downstream cds EJC density"].append(transient_features["cds exons"]-transient_features["cds exon"])
-                        #transient_features["ptc abs. position"].append(exon_cds_start+j)
 
                         if transient_features["cds exons"]-transient_features["cds exon"] != 1:
                             features["FEATURE:last cds exon"].append(0)
@@ -191,30 +180,24 @@ class Create_genome_predictions():
                         transient_features["ptc cds position"].append(transient_features["total cds size"]+j)
                         features["FEATURE:downstream exons"].append(transcript.loc["exons"]-i)
                         features["FEATURE:downstream EJC density"].append((transcript.loc["exons"]-i-1) / transient_features["total exon size"])
-                        #features["FEATURE:ptc downstream distance"].append(exonsend[i]-exon_cds_start-j)
                         features["FEATURE:ptc downstream distance"].append(exonsend[i]-1-exon_cds_start-j)
                         features["FEATURE:ptc exon position"].append(transient_features["current exon size"]+exon_cds_start-exonsstart[i]+j)
 
                         if transient_features["last ejc"] > 0: features["FEATURE:dist. from last EJC"].append(transient_features["last ejc"]-features["FEATURE:ptc exon position"][-1]-1)
-                        # marked (<-) added / removed on 250428 to instead use upstream distance as measure
-                        # else:                                  features["FEATURE:dist. from last EJC"].append(self.params["values"]["FEATURE:dist. from last EJC"]) # <- removed
                         else:                                  features["FEATURE:dist. from last EJC"].append(-((exonsend[i]-exonsstart[i]-1)-(exonsend[i]-1-exon_cds_start-j))) # <- added
                         
                         gc_counter = [1 for k in range(exon_cds_start+j+1, exonsend[i], 1) if self.genome[chr][k] in ["G", "C"]]
-                        #if exonsend[i]-exon_cds_start-j >= self.pattern_cutoff: features["FEATURE:downstream GC ptc count ptc exon"].append(np.sum(gc_counter)/(exonsend[i]-exon_cds_start-j))
                         if exonsend[i]-exon_cds_start-j-1 >= self.pattern_cutoff: features["FEATURE:downstream GC ptc count ptc exon"].append(np.sum(gc_counter)/(exonsend[i]-exon_cds_start-j-1))
                         else:                                                     features["FEATURE:downstream GC ptc count ptc exon"].append(0.5)
 
                         features["exon_cds_start"].append(exon_cds_start)
 
                     if transcript.loc["strand"] == "-":
-                        # <- added from here
                         features["FEATURE:ptc cds position"].append(len(transient_features["downstream cds EJC density"]))
                         features["FEATURE:ptc exon size"].append(exonsend[i]-exonsstart[i]-1) # '-1' is one less than actual exon size (as in prepare_data), ptc side excluded!
                         features["FEATURE:upstream cds exons"].append(transient_features["cds exon"])
                         features["FEATURE:downstream cds exons"].append(transient_features["cds exons"]-transient_features["cds exon"])
                         transient_features["downstream cds EJC density"].append(transient_features["cds exons"]-transient_features["cds exon"])
-                        #transient_features["ptc abs. position"].append(exon_cds_start+j)
 
                         if transient_features["cds exons"]-transient_features["cds exon"] != 1:
                             features["FEATURE:last cds exon"].append(0)
@@ -228,7 +211,6 @@ class Create_genome_predictions():
                         else:
                             features["FEATURE:last cds exon"].append(1)
                             features["FEATURE:50 nt to last cds EJC"].append(1)
-                        # <- until here
 
                         transient_features["ptc cds position"].append(transient_features["total cds size"]+exon_cds_end-exon_cds_start-1-j)
                         features["FEATURE:downstream exons"].append(i+1)
@@ -237,8 +219,6 @@ class Create_genome_predictions():
                         features["FEATURE:ptc exon position"].append(transient_features["current exon size"]+exonsend[i]-exon_cds_end+exon_cds_end-exon_cds_start-1-j)
                         
                         if transient_features["last ejc"] > 0: features["FEATURE:dist. from last EJC"].append(transient_features["last ejc"]-features["FEATURE:ptc exon position"][-1]-1)
-                        # marked (<-) added / removed on 250428 to instead use upstream distance as measure
-                        # else:                                  features["FEATURE:dist. from last EJC"].append(self.params["values"]["FEATURE:dist. from last EJC"]) # <- removed
                         else:                                  features["FEATURE:dist. from last EJC"].append(-((exonsend[i]-exonsstart[i]-1)-(exon_cds_start+j-exonsstart[i]))) # <- added
 
                         gc_counter = [1 for k in range(exonsstart[i], exon_cds_start+j, 1) if self.genome[chr][k] in ["G", "C"]]
@@ -253,7 +233,7 @@ class Create_genome_predictions():
                                                                                                                              exon_cds_end-exon_cds_start, is_last_cds_exon)
                     if transcript.loc["strand"] == "-": lindeboom_prediction, fails, failed = self.get_lindeboom_predictions(fails, transcript_id, transcript.loc["uc id"], cds_index, j-max_it,
                                                                                                                              exon_cds_end-exon_cds_start, is_last_cds_exon)
-                    
+
                     # count the no. of regularly read Lindeboom predictions for later filtering
                     if failed == False: transient_features["regular lindeboom"] += 1
                     
@@ -277,35 +257,33 @@ class Create_genome_predictions():
             if transcript.loc["strand"] == "+": i += 1
             if transcript.loc["strand"] == "-": i -= 1
 
-        #features["transcript id"].extend([transcript_id for _ in range(len(features["FEATURE:ptc downstream distance"])-init_size)])
         features[self.gene_identifier].extend([transcript_id for _ in range(len(features["FEATURE:ptc downstream distance"])-init_size)])
         features["FEATURE:5'utr-size"].extend([transient_features["5'utr-size"] for _ in range(len(features["FEATURE:ptc downstream distance"])-init_size)]) # <- added
         features["FEATURE:3'utr-size"].extend([transient_features["3'utr-size"] for _ in range(len(features["FEATURE:ptc downstream distance"])-init_size)]) 
 
         if transcript.loc["strand"] == "+": # +1 is empirical to match prepare data output
-            #features["FEATURE:ptc-wt stop codon distance"].extend([transient_features["total cds size"]-transient_features["ptc cds position"][i]+1 for i in range(len(transient_features["ptc cds position"]))])
             features["FEATURE:ptc-wt stop codon distance"].extend([transient_features["total cds size"]-transient_features["ptc cds position"][i] for i in range(len(transient_features["ptc cds position"]))])
 
         if transcript.loc["strand"] == "-":
             features["FEATURE:ptc-wt stop codon distance"].extend([transient_features["total cds size"]-transient_features["ptc cds position"][i] for i in range(len(transient_features["ptc cds position"]))])
 
-        # determine cds EJC density (<- added)
+        # determine cds EJC density
         features["FEATURE:cds EJC density"].extend([(transient_features["cds exons"]-1) / transient_features["total cds size"]
                                                     for i in range(len(features["FEATURE:ptc downstream distance"])-init_size)]) # <-
 
-        # determine downstream cds EJC density (<- added)
+        # determine downstream cds EJC density
         features["FEATURE:downstream cds EJC density"].extend([(transient_features["downstream cds EJC density"][i]-1) / transient_features["total cds size"]
                                                                for i in range(len(transient_features["downstream cds EJC density"]))]) # <-
 
-        # determine all exon GC count (<- added)
+        # determine all exon GC count
         gc_ratio = len([1 for base in transient_features["all exons"] if base in ["G", "C"]])/len(transient_features["all exons"]) # <-
         features["FEATURE:total GC count exons"].extend([gc_ratio for i in range(len(features["FEATURE:ptc downstream distance"])-init_size)]) # <-
 
-        # append expression features (<- added)
-        selected_expressions = pd.DataFrame() # <-
+        # append expression features
+        selected_expressions = pd.DataFrame()
 
-        if type(self.knowngene.iloc[it].loc["gene id"]) == str: # <-
-            selected_expressions = self.expressions[self.expressions["gene_id"] == self.knowngene.iloc[it].loc["gene id"].split(".")[0]] # <-
+        if type(self.knowngene.iloc[it].loc["gene id"]) == str:
+            selected_expressions = self.expressions[self.expressions["gene_id"] == self.knowngene.iloc[it].loc["gene id"].split(".")[0]]
 
         if selected_expressions.shape[0] > 0: # <-
             features["FEATURE:mean expression"].extend([selected_expressions.iloc[0].loc["mean_fpkm_unstranded"]
@@ -323,53 +301,40 @@ class Create_genome_predictions():
             features["FEATURE:median expression"].extend([self.values["FEATURE:median expression"]
                                                           for i in range(len(features["FEATURE:ptc downstream distance"])-init_size)]) # <-
 
-        # append allele frequencies (currently, only estimates as in Lindeboom et al. 2019) <-
-        # features["FEATURE:AF"].extend([self.values["FEATURE:AF"] for i in range(len(features["FEATURE:ptc downstream distance"])-init_size)]) # <-
 
         # check if total cds size equals lindeboom size, if not replace all selected Lindeboom predictions by default (to synchronize behaviour from apply_lindeboom)
-        #if transient_features["total cds size"]-3 == transient_features["regular lindeboom"]: # <- removed
-        if transient_features["total cds size"]-3 == transient_features["total lindeboom size"]: # <- added
+        if transient_features["total cds size"]-3 == transient_features["total lindeboom size"]:
             features["FEATURE:lindeboom prediction"].extend(transient_features["lindeboom prediction"])
 
         else:
-            # marked (<-) added / removed on 250428 to allow usage of default values and training values
-            #features["FEATURE:lindeboom prediction"].extend([self.params["values"]["FEATURE:lindeboom prediction"]
-            #                                                for _ in range(len(transient_features["lindeboom prediction"]))]) # <- removed
             features["FEATURE:lindeboom prediction"].extend([self.values["FEATURE:lindeboom prediction"]
-                                                             for _ in range(len(transient_features["lindeboom prediction"]))]) # <- added
+                                                             for _ in range(len(transient_features["lindeboom prediction"]))])
             fails[transcript_id]["cds_mismatch"] += 1
 
         # correct for small error due to stop codon distributed over two exons
-        if transient_features["last cds correction"] > 0: # <- added
-            for col in features: # <- added
-                for _ in range(transient_features["last cds correction"]): # <- added
-                    features[col].pop() # <- added
+        if transient_features["last cds correction"] > 0:
+            for col in features:
+                for _ in range(transient_features["last cds correction"]):
+                    features[col].pop()
 
 
-        if len(features["FEATURE:lindeboom prediction"])-init_size != len(transient_features["all cds"])-3: # <- added
-            print("< inconsistent size for "+transcript.loc["transcript id"] # <- added
-                  +" ("+str(len(features["FEATURE:lindeboom prediction"])-init_size)+"/"+str(len(transient_features["all cds"])-3)+")") # <- added
-            exit() # <- added
+        if len(features["FEATURE:lindeboom prediction"])-init_size != len(transient_features["all cds"])-3:
+            print("< inconsistent size for "+transcript.loc["transcript id"]
+                  +" ("+str(len(features["FEATURE:lindeboom prediction"])-init_size)+"/"+str(len(transient_features["all cds"])-3)+")")
+            exit()
 
         return features, fails
 
 
     def get_lindeboom_predictions(self, fails, transcript_id, ucid, exon_index, cds_position, cds_size, is_last_cds_exon):
         failed = False
-        # marked (<-) added / removed on 250428 to allow usage of default values and training values
-        # lindeboom_prediction = self.params["values"]["FEATURE:lindeboom prediction"] # <- removed
         lindeboom_prediction = self.values["FEATURE:lindeboom prediction"] # <- added
 
         if is_last_cds_exon == True: cds_size -= 3
 
         if ucid.split(".")[0] in self.lindeboom_dictionary.keys():
             if exon_index != None and exon_index >= 0 and exon_index < len(self.lindeboom_dictionary[ucid.split(".")[0]]):
-                # marked (<-) added/removed on 250430 to avoid error due to start codon split over two exons
-                #if cds_size != len(self.lindeboom_dictionary[ucid.split(".")[0]][exon_index]["scores"]): # <- removed
-                #    fails[transcript_id]["lindeboom_size_test_error"] += 1; failed = True # <- removed
-                
-                #elif cds_position < len(self.lindeboom_dictionary[ucid.split(".")[0]][exon_index]["scores"]): # <- removed
-                if cds_position < len(self.lindeboom_dictionary[ucid.split(".")[0]][exon_index]["scores"]): # <- added
+                if cds_position < len(self.lindeboom_dictionary[ucid.split(".")[0]][exon_index]["scores"]):
                     if self.params["lindeboom_output"] == "nonASE":
                         lindeboom_prediction = self.lindeboom_dictionary[ucid.split(".")[0]][exon_index]["scores"][cds_position]
                     
@@ -377,7 +342,7 @@ class Create_genome_predictions():
                         lindeboom_prediction = 1/(2*math.exp(-math.log(2)*self.lindeboom_dictionary[ucid.split(".")[0]][exon_index]["scores"][cds_position]))
                 
                 else:
-                    fails[transcript_id]["lindeboom_cds_size_error"] += 1; failed = True; #print("2", exon_index, cds_position)
+                    fails[transcript_id]["lindeboom_cds_size_error"] += 1; failed = True
             
             elif exon_index < 0 or exon_index == None:
                     fails[transcript_id]["lindeboom_exon_index_error"] += 1; failed = True
@@ -396,13 +361,13 @@ class Create_genome_predictions():
         if self.params["hg_build"] == "hg19":
             self.gene_identifier = "uc id"
             hg_build_dir         = "hg19"
-            knowngene_fname      = "hg19_knownGene.txt"
+            knowngene_fname      = "hg19_knownGene_appended_cuomo_selection.txt"
             lindeboom_fname      = "hg19_NMDetectiveA_Lindeboom_et_al.v2.gtf"
 
         if self.params["hg_build"] == "hg38":
             self.gene_identifier = "transcript id"
             hg_build_dir         = "hg38.p14"
-            knowngene_fname      = "hg38_knownGene.txt"
+            knowngene_fname      = "hg38_knownGene_appended_deviation_selection.txt"
             lindeboom_fname      = "hg38_NMDetectiveA_Lindeboom_et_al.v2.gtf"
 
 
@@ -431,18 +396,12 @@ class Create_genome_predictions():
         self.expressions            = pd.read_csv(self.params["data_dir"]+self.params["os_sep"]+self.params["expressions_fname"], delimiter=",", index_col=False) # <-
         self.expressions["gene_id"] = [self.expressions.iloc[i].loc["gene_id"].split(".")[0] for i in range(self.expressions.shape[0])]
 
-        # marked (<-) added on 250427 to integrate allele frequency as feature
-        # self.gnomad_db = gnomAD_DB(self.params["data_dir"], gnomad_version="v4") # <- added
-
-        # marked (<-) added on 250428 to allow flexible usage of params->default_values or params->values (see initialize)
         # default values are prioritized over values
         self.values = {**self.params["default_values"], **{key: self.params["values"][key] for key in self.params["values"] if key not in self.params["default_values"]}} # <-
 
 
     def invert(self, seq):
         inverse_seq = ""
-        #bases         = ["A", "C", "G", "T"]
-        #inverse_bases = ["T", "G", "C", "A"]
         bases         = ["A", "C", "G", "T", "N", "-"]
         inverse_bases = ["T", "G", "C", "A", "N", "-"]
         
@@ -461,12 +420,7 @@ class Create_genome_predictions():
     def _predict(self, predictions, thread_index, thread_id):
         print("< thread id:", thread_id, "-", thread_index[0], "/", thread_index[1])
 
-        # iterate over entries in genome dictionary and conduct predictions for coding sequences
-        #features  = {**{"transcript id": []}, **{"exon_cds_start": []}, **{feature: [] for feature in self.models[0].feature_names_in_}}
-
-        # marked (<-) added / removed on 250428
-        # features  = {**{self.gene_identifier: []}, **{"exon_cds_start": []}, **{feature: [] for feature in self.models[0].feature_names_in_}} # <- removed
-        features  = {**{self.gene_identifier: []}, **{"exon_cds_start": []}, **{feature: [] for feature in self.selected_features}} # <- added
+        features  = {**{self.gene_identifier: []}, **{"exon_cds_start": []}, **{feature: [] for feature in self.selected_features}}
         fails     = {}
         
         # feature extraction
@@ -490,9 +444,7 @@ class Create_genome_predictions():
         all_preds        = np.zeros((0))
 
         for i in range(len(self.models)):
-            # marked (<-) added / removed on 250428 to select only features required by the model
-            # preds = self.models[i].predict(features.loc[:,features.columns.tolist()[2::]]) # <- removed
-            preds = self.models[i].predict(features.loc[:, self.models[0].feature_names_in_]) # <- added
+            preds = self.models[i].predict(features.loc[:, self.models[0].feature_names_in_])
             if all_preds.shape[0] > 0: all_preds = np.column_stack((all_preds, preds))
             else:                      all_preds = preds
 
@@ -502,16 +454,11 @@ class Create_genome_predictions():
         predictions_by_exon = {}
         test_size           = 0
         for i in range(len(all_preds)):
-            # marked (<-) added / removed on 250430 to avoid explitit output of number format on MacOS (e.g. np.int64(number))
-            # predictions.at[features.iloc[i].loc[self.gene_identifier], "predictions"].append(round(all_preds[i], 4)) # <- removed
-            predictions.at[features.iloc[i].loc[self.gene_identifier], "predictions"].append(float(round(all_preds[i], 4))) # <- added
+            predictions.at[features.iloc[i].loc[self.gene_identifier], "predictions"].append(float(round(all_preds[i], 4)))
 
-            #if last_transcript_id != None and last_transcript_id != features.iloc[i].loc["transcript id"]:
             if last_transcript_id != None and last_transcript_id != features.iloc[i].loc[self.gene_identifier]:
                 predictions.at[last_transcript_id, "fails"]               = fails[last_transcript_id]
                 predictions.at[last_transcript_id, "predictions_by_exon"] = predictions_by_exon
-                # marked (<-) added / removed on 250430 to avoid explitit output of number format on MacOS (e.g. np.int64(number))
-                # predictions_by_exon                                       = {features.iloc[i].loc["exon_cds_start"]: [round(all_preds[i], 4)]} # <- removed
                 predictions_by_exon                                       = {int(features.iloc[i].loc["exon_cds_start"]): [float(round(all_preds[i], 4))]} # <- added
 
                 if len(predictions.loc[last_transcript_id].loc["predictions"]) != test_size:
@@ -520,13 +467,9 @@ class Create_genome_predictions():
                 test_size = 1
 
             else:
-                # marked (<-) added / removed on 250430 to avoid explitit output of number format on MacOS (e.g. np.int64(number))
-                # if features.iloc[i].loc["exon_cds_start"] in predictions_by_exon: predictions_by_exon[features.iloc[i].loc["exon_cds_start"]].append(round(all_preds[i], 4)); test_size += 1 # <- removed
-                # else:                                                             predictions_by_exon[features.iloc[i].loc["exon_cds_start"]] = [round(all_preds[i], 4)]; test_size += 1 # <- removed
                 if features.iloc[i].loc["exon_cds_start"] in predictions_by_exon: predictions_by_exon[int(features.iloc[i].loc["exon_cds_start"])].append(float(round(all_preds[i], 4))); test_size += 1 # <- added
                 else:                                                             predictions_by_exon[int(features.iloc[i].loc["exon_cds_start"])] = [float(round(all_preds[i], 4))]; test_size += 1 # <- added
 
-            #last_transcript_id = features.iloc[i].loc["transcript id"]
             last_transcript_id = features.iloc[i].loc[self.gene_identifier]
 
         # register last block
@@ -539,9 +482,6 @@ class Create_genome_predictions():
         model_end_time = time.time()
         print("< thread id:", thread_id, ", feature time", feature_end_time-feature_start_time, ", steps", steps, ", model time", model_end_time-feature_start_time)
         
-        # back testing for consistency of exon-resolved predictions and aggregated predictions
-        return
-
 
     def predict(self):
         if self.knowngene.shape[0]-self.knowngene.drop_duplicates(subset=[self.gene_identifier]).shape[0] != 0:

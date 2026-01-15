@@ -17,19 +17,18 @@ import string
 import sys
 parent_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
 sys.path.insert(0, parent_dir+"\\shared")
-import time # <- added on 250506
+import time
 
-from mask_predictions import * # <- added on 250620
+from mask_predictions import *
 from shared_utils import *
 
-
-seed_time = time.time() # <- added on 250506
-random.seed(0) # <- added on 250506
+seed_time = time.time()
+random.seed(0)
 
 
 class Analyze_predictions_utils(Mask_predictions):
     def __init__(self, params, mutation_stats):
-        super().__init__(params, mutation_stats) # <- added on 250506
+        super().__init__(params, mutation_stats)
 
         self.params             = params
 
@@ -37,12 +36,18 @@ class Analyze_predictions_utils(Mask_predictions):
         self.blocks             = None
         self.expression_stats   = None
         self.global_predictions = None
-        self.masking_stats      = pd.DataFrame() # <- added on 250612
+        self.masking_stats      = pd.DataFrame()
         self.means              = {"gene id": [], "mean": []}
-        self.mutation_stats     = mutation_stats # <- added on 250603
+        self.mutation_stats     = mutation_stats
         self.predictions        = None
+        self.seqs               = None
+
+        if "id_filter" in self.params and self.params["id_filter"] == "CPTAC3":
+            self.params["selection_cols"] = {"gene symbol": "ID:gene symbol", "project": "ID:project", "case id": "ID:case id", "sample id": "ID:sample id"}
+            self.projects                 = ["Adenomas and Adenocarcinomas", "Ductal and Lobular Neoplasms", "Epithelial Neoplasms, NOS", "Gliomas", "Lipomatous Neoplasms",
+                                             "Nevi and Melanomas", "Squamous Cell Neoplasms", "Transitional Cell Papillomas and Carcinomas"]
         
-        if "id_filter" in self.params and self.params["id_filter"] == "MSK":
+        elif "id_filter" in self.params and self.params["id_filter"] == "MSK":
             self.params["selection_cols"] = {"gene symbol": "ID:gene symbol", "sample id": "ID:sample id", "cancer type": "ID:cancer type"}
             self.projects                 = ["Breast Cancer", "Colorectal Cancer", "Non-Small Cell Lung Cancer", "Pancreatic Cancer", "Prostate Cancer"]
 
@@ -71,6 +76,172 @@ class Analyze_predictions_utils(Mask_predictions):
             self.print_params()
 
 
+    def _analyze_adaptation(self, rules_analysis, exon_probs, exon_pos, exon_scores, index, total_cds, category, side, show=False):
+        if index[1] <= index[0]: return rules_analysis
+        rules_analysis[category]["expected_"+side] += np.nansum(exon_probs[index[0]:index[1]])
+        rules_analysis[category]["observed_"+side] += np.sum([1 for i in exon_pos if i-total_cds >= index[0] and i-total_cds < index[1]])
+        rules_analysis[category][side+"_size"]     += index[1]-index[0]
+        rules_analysis[category][side+"_preds"].extend([exon_scores[k] for k in range(len(exon_scores)) if exon_pos[k] >= index[0] and exon_pos[k] < index[1]])
+        if show == True: print(category, {key: rules_analysis[category][key] for key in rules_analysis[category] if "preds" not in key})
+        return rules_analysis
+
+
+    def analyze_adaptation(self):
+        stop_codon_distribution = [0 for _ in range(100)]
+        start_cutoffs           = [0, 50, 100, 150, 200, 250, 300, 500]
+        ptc_distribution        = {"occurrence": [0 for _ in range(100)], "susceptibility": [[] for _ in range(100)]}
+        rules_analysis          = {"canonical": {"expected_escape": 0, "expected_target": 0, "observed_escape": 0, "observed_target": 0, "escape_size": 0, "target_size": 0, "escape_preds": [], "target_preds": [],
+                                                 "binomial statistic": None, "binomial pvalue": None, "fisher exact pvalue": None, "fisher exact statistic": None,
+                                                 "median escape": None, "median target": None, "mw statistic": None, "mw pvalue": None},
+                                   **{"lindeboom_"+str(start_cutoff): {"expected_escape": 0, "expected_target": 0, "observed_escape": 0, "observed_target": 0, "escape_size": 0, "target_size": 0, "escape_preds": [], "target_preds": [],
+                                                                       "binomial statistic": None, "binomial pvalue": None, "fisher exact pvalue": None, "fisher exact statistic": None,
+                                                                       "median escape": None, "median target": None, "mw statistic": None, "mw pvalue": None}
+                                                                       for start_cutoff in start_cutoffs}}
+        
+        total_cds_test = 0
+        bar = IncrementalBar(set_bar("analyzing adaptation"), max=self.predictions.shape[0])
+        for i in range(self.predictions.shape[0]):
+            for exon in self.predictions.iloc[i].loc["variant targets"]["LABEL:NMD score"]:
+                for j in range(len(self.predictions.iloc[i].loc["variant targets"]["LABEL:NMD score"][exon])):
+                    if pd.isna(self.predictions.iloc[i].loc["variant targets"]["LABEL:NMD score"][exon][j]) == False:
+                        ptc_pos = int(self.predictions.iloc[i].loc["variant targets"]["FEATURE:ptc cds position"][exon][j])
+                        pos     = int(100*(ptc_pos/ len(self.predictions.iloc[i].loc["probabilities"])))
+                        ptc_distribution["occurrence"][pos] += 1
+                        ptc_distribution["susceptibility"][pos].append(self.predictions.iloc[i].loc["variant targets"]["LABEL:NMD score"][exon][j])
+
+            for j in range(len(self.predictions.iloc[i].loc["probabilities"])):
+                if pd.isna(self.predictions.iloc[i].loc["probabilities"][j]) == False:
+                    pos = int(100*(j / len(self.predictions.iloc[i].loc["probabilities"])))
+                    stop_codon_distribution[pos] += self.predictions.iloc[i].loc["probabilities"][j]
+
+            total_cds = 0
+            for j, exon in enumerate(self.predictions.iloc[i].loc["probabilities_by_exon"]):
+                exon_probs  = self.predictions.iloc[i].loc["probabilities_by_exon"][exon]
+                exon_pos    = self.predictions.iloc[i].loc["variant targets"]["FEATURE:ptc cds position"][exon]
+                exon_scores = self.predictions.iloc[i].loc["variant targets"]["LABEL:NMD score"][exon]
+
+                # canonical rules
+                if j < len(self.predictions.iloc[i].loc["probabilities_by_exon"])-2:
+                    rules_analysis = self._analyze_adaptation(rules_analysis, exon_probs, exon_pos, exon_scores, (0, len(exon_probs)), total_cds, "canonical", "target")
+                
+                # penultimate exon
+                if j == len(self.predictions.iloc[i].loc["probabilities_by_exon"])-2:
+                    rules_analysis = self._analyze_adaptation(rules_analysis, exon_probs, exon_pos, exon_scores, (0, max(0, len(exon_probs)-50)), total_cds, "canonical", "target")
+                    rules_analysis = self._analyze_adaptation(rules_analysis, exon_probs, exon_pos, exon_scores, (max(0, len(exon_probs)-50), len(exon_probs)), total_cds, "canonical", "escape")
+
+                # last exon
+                if j == len(self.predictions.iloc[i].loc["probabilities_by_exon"])-1:
+                    rules_analysis = self._analyze_adaptation(rules_analysis, exon_probs, exon_pos, exon_scores, (0, len(exon_probs)), total_cds, "canonical", "escape")
+                
+                if total_cds_test+len(exon_probs) != rules_analysis["canonical"]["escape_size"]+rules_analysis["canonical"]["target_size"]:
+                    print("< size error1 occurred @analyze_adaptation:", total_cds_test, "/", rules_analysis["canonical"]["escape_size"]+rules_analysis["canonical"]["target_size"])
+                    exit()
+
+                # lindeboom rules
+                for start_cutoff in start_cutoffs:
+                    if j < len(self.predictions.iloc[i].loc["probabilities_by_exon"])-2:
+                        if total_cds < start_cutoff:
+                            rules_analysis = self._analyze_adaptation(rules_analysis, exon_probs, exon_pos, exon_scores, (0, min(start_cutoff-total_cds, len(exon_probs))),
+                                                                      total_cds, "lindeboom_"+str(start_cutoff), "escape")
+                            rules_analysis = self._analyze_adaptation(rules_analysis, exon_probs, exon_pos, exon_scores, (min(start_cutoff-total_cds, len(exon_probs)),
+                                                                      len(exon_probs)), total_cds, "lindeboom_"+str(start_cutoff), "target")
+                            
+                        if total_cds >= start_cutoff:
+                            rules_analysis = self._analyze_adaptation(rules_analysis, exon_probs, exon_pos, exon_scores, (0, len(exon_probs)),
+                                                                      total_cds, "lindeboom_"+str(start_cutoff), "target")
+
+                    # penultimate exon
+                    if j == len(self.predictions.iloc[i].loc["probabilities_by_exon"])-2:
+                        if total_cds < start_cutoff:
+                            rules_analysis = self._analyze_adaptation(rules_analysis, exon_probs, exon_pos, exon_scores, (0, min(start_cutoff-total_cds, len(exon_probs))),
+                                                                      total_cds, "lindeboom_"+str(start_cutoff), "escape")
+                            rules_analysis = self._analyze_adaptation(rules_analysis, exon_probs, exon_pos, exon_scores, (min(start_cutoff-total_cds, len(exon_probs)),
+                                                                      max(0, len(exon_probs)-50)), total_cds, "lindeboom_"+str(start_cutoff), "target")
+                            rules_analysis = self._analyze_adaptation(rules_analysis, exon_probs, exon_pos, exon_scores, (max(min(start_cutoff-total_cds, len(exon_probs)),
+                                                                      max(0, len(exon_probs)-50)), len(exon_probs)), total_cds, "lindeboom_"+str(start_cutoff), "escape")
+
+                            if len(exon_probs)-max(min(start_cutoff-total_cds, len(exon_probs)), max(0, len(exon_probs)-50)) > 50:
+                                print("< size error2 occurred with", max(min(start_cutoff-total_cds, len(exon_probs))), "/", len(exon_probs))
+                                exit()
+
+                        if total_cds >= start_cutoff:
+                            rules_analysis = self._analyze_adaptation(rules_analysis, exon_probs, exon_pos, exon_scores, (0, max(0, len(exon_probs)-50)),
+                                                                      total_cds, "lindeboom_"+str(start_cutoff), "target")
+                            rules_analysis = self._analyze_adaptation(rules_analysis, exon_probs, exon_pos, exon_scores, (max(0, len(exon_probs)-50), len(exon_probs)),
+                                                                      total_cds, "lindeboom_"+str(start_cutoff), "escape")
+
+                    # last exon
+                    if j == len(self.predictions.iloc[i].loc["probabilities_by_exon"])-1:
+                        rules_analysis = self._analyze_adaptation(rules_analysis, exon_probs, exon_pos, exon_scores, (0, len(exon_probs)), total_cds,
+                                                                  "lindeboom_"+str(start_cutoff), "escape")
+                    
+                    if (total_cds_test+len(exon_probs) != rules_analysis["lindeboom_"+str(start_cutoff)]["escape_size"]
+                        +rules_analysis["lindeboom_"+str(start_cutoff)]["target_size"]):
+                        print("< size error3 occurred @analyze_adaptation:", total_cds_test, "/", rules_analysis["lindeboom_"+str(start_cutoff)]["escape_size"]
+                              +rules_analysis["lindeboom_"+str(start_cutoff)]["target_size"])
+                        exit()
+                        
+                total_cds      += len(exon_probs)
+                total_cds_test += len(exon_probs)
+
+            #bar.next()
+        bar.finish()
+
+        # analyze trajectory
+        ptc_distribution["susceptibility"] = [np.mean(susceptibilities) if len(susceptibilities) > 0 else 0 for susceptibilities in ptc_distribution["susceptibility"]]
+        corr_ptc_occurrence                = [value / np.sum(ptc_distribution["occurrence"]) for value in ptc_distribution["occurrence"]]
+        corr_stop_codon_distribution       = [value / np.sum(stop_codon_distribution) for value in stop_codon_distribution]
+        corr_susceptibilities              = [value / np.sum(ptc_distribution["susceptibility"]) for value in ptc_distribution["susceptibility"]]
+
+        adaptation_analysis = pd.DataFrame({"susceptibility": ptc_distribution["susceptibility"], "rel. susceptibility": corr_susceptibilities,
+                                            "stop codon occurrence": stop_codon_distribution, "rel. stop codon occurrence": corr_stop_codon_distribution,
+                                            "ptc occurrence": ptc_distribution["occurrence"], "rel. ptc occurrence": corr_ptc_occurrence})
+        
+        adaptation_analysis.to_csv(self.newdir+self.params["os_sep"]+self.params["file_tag"]+"_adaptation_analysis.txt", index=False, sep=",")
+
+        plt.plot(corr_stop_codon_distribution, label="stop codon candidates")
+        plt.plot(corr_ptc_occurrence, label="observed PTCs")
+        plt.plot(corr_susceptibilities, label="mean susceptibility")
+        plt.legend()
+        plt.show()
+
+        # analyze categories
+        for key in rules_analysis:
+            total  = rules_analysis[key]["observed_escape"]+rules_analysis[key]["observed_target"]
+            fisher = stats.fisher_exact([[rules_analysis[key]["expected_escape"]*total, rules_analysis[key]["expected_target"]*total],
+                                         [rules_analysis[key]["observed_escape"], rules_analysis[key]["observed_target"]]])
+            rules_analysis[key]["fisher exact statistic"] = fisher.statistic
+            rules_analysis[key]["fisher exact pvalue"]    = fisher.pvalue
+
+            # binomial test
+            expected_probability = rules_analysis[key]["expected_escape"] / (rules_analysis[key]["expected_escape"]+rules_analysis[key]["expected_target"])
+            observed_probability = rules_analysis[key]["observed_escape"] / (rules_analysis[key]["observed_escape"]+rules_analysis[key]["observed_target"])       
+            rules_analysis[key]["binomial statistic"] = observed_probability-expected_probability
+
+            if observed_probability >= expected_probability:
+                rules_analysis[key]["binomial pvalue"] = 1-stats.binom.cdf(rules_analysis[key]["observed_escape"]-1,
+                                                                          (rules_analysis[key]["observed_escape"]+rules_analysis[key]["observed_target"]), expected_probability)
+
+            if observed_probability < expected_probability:
+                rules_analysis[key]["binomial pvalue"] = stats.binom.cdf(rules_analysis[key]["observed_escape"],
+                                                                        (rules_analysis[key]["observed_escape"]+rules_analysis[key]["observed_target"]), expected_probability)
+                
+            # Mann-Whitney U-test
+            rules_analysis[key]["median escape"] = np.median(rules_analysis[key]["escape_preds"])
+            rules_analysis[key]["median target"] = np.median(rules_analysis[key]["target_preds"])
+            mw                                   = stats.mannwhitneyu(rules_analysis[key]["escape_preds"], rules_analysis[key]["target_preds"])
+            rules_analysis[key]["mw statistic"]  = mw.statistic
+            rules_analysis[key]["mw pvalue"]     = mw.pvalue
+
+        for key1 in rules_analysis:
+            for key2 in rules_analysis[key1]:
+                if type(rules_analysis[key1][key2]) != list:
+                    print(key1, key2, rules_analysis[key1][key2])
+
+        with open(self.newdir+self.params["os_sep"]+self.params["file_tag"]+"_rules_analysis.txt", "w") as f:
+            f.write(json.dumps(rules_analysis, indent=4))
+
+
     def analyze_blocks(self, status):
         block_stats   = {**{block_target: [] for block_target in self.params["block_targets"]}, **{"mean": [], "std": [], "count": [], "mean_count": []}}
         self.variants = self.variants.sort_values(by=self.params["block_targets"])
@@ -83,7 +254,6 @@ class Analyze_predictions_utils(Mask_predictions):
             for block_target in self.params["block_targets"]:
                 block_stats[block_target].append(blocks[i]["block id"][block_target])
 
-            #print("i", i, blocks[i]["block id"], np.mean(selected_block["FEATURE:prediction"]), np.std(selected_block["FEATURE:prediction"]), selected_block["FEATURE:prediction"].shape[0])
             block_stats["mean"].append(np.mean(selected_block["FEATURE:prediction"]))
             block_stats["std"].append(np.std(selected_block["FEATURE:prediction"]))
             block_stats["count"].append(selected_block["FEATURE:prediction"].shape[0])
@@ -142,11 +312,7 @@ class Analyze_predictions_utils(Mask_predictions):
 
             # testing against the individual average
             if self.params["selection_mode"] == "relative":
-                # marked (<-) added /removed on 250523 to adapt to different selection methods
-                # escape = len([j for j in range(len(real_predictions)) if real_predictions[j] < genes.iloc[i].loc["avg. model prediction"]]) # <- removed
-                # target = len([j for j in range(len(real_predictions)) if real_predictions[j] > genes.iloc[i].loc["avg. model prediction"]]) # <- removed
-
-                if self.params["selection_method"] == "binomial": # <- added from here
+                if self.params["selection_method"] == "binomial":
                     escape = len([j for j in range(len(real_predictions)) if genes.iloc[i].loc["binomial-statistic "+self.params["variant_test_targets"][0]] > 0])
                     target = len([j for j in range(len(real_predictions)) if genes.iloc[i].loc["binomial-statistic "+self.params["variant_test_targets"][0]] < 0])
 
@@ -179,8 +345,19 @@ class Analyze_predictions_utils(Mask_predictions):
             if "pvalue" in col:
                 print(col, genes[col][genes[col].isna()].shape[0], genes[col][0:genes[col].shape[0]-1].min(),
                       genes[col][0:genes[col].shape[0]-1].max(), genes[col][0:genes[col].shape[0]-1].mean())
+                
+        # <- test shifted from below on 251115
+        if genes.shape[0] > 0 and genes.iloc[-1].loc["block id"] != "total":
+            print("< total value not found.")
+            exit()
 
-        if genes.iloc[-1].loc["block id"] == "total":
+        # <- added on 251021 to allow exclusion of low-counting variants
+        if self.params["selection_minsize"] != None:
+            init_shape = genes.shape[0]
+            genes      = genes[genes["avg. real size"] >= self.params["selection_minsize"]]
+            print("< filtering using selection_minsize reduced dataset from", init_shape, "to", genes.shape[0])
+
+        if genes.shape[0] > 0 and genes.iloc[-1].loc["block id"] == "total": # <- "genes.shape[0] > 0 and" added on 251104 from 
             # create false-discovery-rate-corrected pvalues
             for col in genes:
                 if "pvalue" in col:
@@ -190,20 +367,13 @@ class Analyze_predictions_utils(Mask_predictions):
                     # .api needed to be used (import statsmodel.api as sm instead of statsmodel as sms)
                     # sm.stats.fdrcorrection was used instead of sm.stats.multitest.fdrcorrection
                     # total value must be excluded from FDR correction
-
-                    # marked (<-) added / removed on 250529 to allow removal of nan values
-                    # genes[col] = [*sm.stats.fdrcorrection(genes[col][0:genes[col].shape[0]-1], alpha=0.05)[1].tolist(), genes.iloc[-1].loc[col]] # <- removed
-                    index      = [i for i in range(genes.shape[0]-1) if pd.isna(genes.iloc[i].loc[col]) == False] # <- added
-                    pvalues    = [genes.iloc[i].loc[col] for i in range(genes.shape[0]-1) if pd.isna(genes.iloc[i].loc[col]) == False] # <- added
-                    pvalues    = sm.stats.fdrcorrection(pvalues, alpha=0.05)[1] # <- added
-                    genes[col] = [*[None for _ in range(genes.shape[0]-1)], genes.iloc[-1].loc[col]] # <- added
+                    index      = [i for i in range(genes.shape[0]-1) if pd.isna(genes.iloc[i].loc[col]) == False] 
+                    pvalues    = [genes.iloc[i].loc[col] for i in range(genes.shape[0]-1) if pd.isna(genes.iloc[i].loc[col]) == False]
+                    pvalues    = sm.stats.fdrcorrection(pvalues, alpha=0.05)[1]
+                    genes[col] = [*[None for _ in range(genes.shape[0]-1)], genes.iloc[-1].loc[col]]
                     
-                    for i, mapped_i in enumerate(index): # <- added
-                        genes.at[genes.index[mapped_i], col] = pvalues[i] # <- added
- 
-        else:
-            print("< total value not found.")
-            exit()
+                    for i, mapped_i in enumerate(index):
+                        genes.at[genes.index[mapped_i], col] = pvalues[i]
 
         for col in genes:
             if "pvalue" in col:
@@ -212,9 +382,7 @@ class Analyze_predictions_utils(Mask_predictions):
         # filter for genes below significance threshold
         init_shape = genes.shape[0]
 
-        # marked (<-) added / removed on 250516 to allow simultaneous calculation of target and escape if either one is selected
-        # genes = genes[genes[self.params["selection_method"]+"-pvalue "+self.params["variant_test_targets"][0]] <= self.params["variant_test_cutoff"]] # <- removed
-        if "escape" not in self.params["selection_method"] and "target" not in self.params["selection_method"]: # <- added from here
+        if "escape" not in self.params["selection_method"] and "target" not in self.params["selection_method"]:
             genes = genes[genes[self.params["selection_method"]+"-pvalue "+self.params["variant_test_targets"][0]] <= self.params["variant_test_cutoff"]]
 
         else:
@@ -222,7 +390,6 @@ class Analyze_predictions_utils(Mask_predictions):
             target_genes = genes[genes[self.params["selection_method"].replace("escape", "target")+"-pvalue "+self.params["variant_test_targets"][0]] <= self.params["variant_test_cutoff"]]
             genes        = pd.concat([escape_genes, target_genes])
             genes        = genes.drop_duplicates(subset="gene symbol")
-        # <- until here
             
         print("< applying selection cutoff", self.params["variant_test_cutoff"], "reduced data from", init_shape, "to", genes.shape[0])
         
@@ -256,7 +423,6 @@ class Analyze_predictions_utils(Mask_predictions):
             print("< significance filtering removed all entries.")
     
 
-    # function (<-) added on 250528
     def _analyze_stop_codons(self):
         bases = ["A", "C", "G", "T"]
 
@@ -407,17 +573,15 @@ class Analyze_predictions_utils(Mask_predictions):
         # test_results = self.conduct_test(model_predictions, variant_predictions, self.params["variant_test_targets"][0]) # <- removed
         if self.params["apply_mutation_stats"] == False: # <- added
             # marked (<-) added on 250821 to allow weights for masked calculations
-            if self.params["mutation_stats_ptc_weights"] == True or self.params["apply_mutation_weights"] == True: # recheck
+            if self.params["mutation_stats_ptc_weights"] == True or self.params["apply_mutation_weights"] == True:
                 model_probabilities = []
                 [model_probabilities.extend(self.predictions.iloc[i].loc["probabilities"]) for i in range(self.predictions.shape[0])]
-
-                #model_predictions = self.calculate_distribution(model_predictions, model_weights)
                 test_results = self.conduct_test_w_mutation_stats(model_predictions, model_probabilities, variant_predictions, self.params["variant_test_targets"][0]) # <- added
 
             else:
-                test_results = self.conduct_test(model_predictions, variant_predictions, self.params["variant_test_targets"][0]) # <- added
+                test_results = self.conduct_test(model_predictions, variant_predictions, self.params["variant_test_targets"][0])
 
-        if self.params["apply_mutation_stats"] == True: # <- added
+        if self.params["apply_mutation_stats"] == True:
             model_probabilities = []
             [model_probabilities.extend(self.predictions.iloc[i].loc["probabilities"]) for i in range(self.predictions.shape[0])]
             test_results = self.conduct_test_w_mutation_stats(model_predictions, model_probabilities, variant_predictions, self.params["variant_test_targets"][0]) # <- added
@@ -425,15 +589,12 @@ class Analyze_predictions_utils(Mask_predictions):
         total_predictions                                = pd.DataFrame({col: [None] for col in self.predictions.columns})
         total_predictions.at[0, "block id"]              = "total"
         # avg. real size must be present in order to avoid elimination before storage
-        # marked (<-) added / removed on 250529
-        #total_predictions.at[0, "avg. model prediction"] = np.mean(model_predictions) # <- removed
-        #total_predictions.at[0, "avg. real prediction"]  = np.mean(variant_predictions) # <- removed
-        total_predictions.at[0, "avg. model prediction"] = np.nanmean(model_predictions) # <- added
-        total_predictions.at[0, "avg. real prediction"]  = np.nanmean(variant_predictions) # <- added
+        total_predictions.at[0, "avg. model prediction"] = np.nanmean(model_predictions)
+        total_predictions.at[0, "avg. real prediction"]  = np.nanmean(variant_predictions)
 
         # marked (<-) added on 2502523
-        total_predictions.at[0, "median model prediction"] = np.nanmedian(model_predictions) # <- added
-        total_predictions.at[0, "median real prediction"]  = np.nanmedian(variant_predictions) # <- added
+        total_predictions.at[0, "median model prediction"] = np.nanmedian(model_predictions)
+        total_predictions.at[0, "median real prediction"]  = np.nanmedian(variant_predictions)
         total_predictions.at[0, "avg. real size"]          = len(variant_predictions)
         # "predictions" must be represented for later processing / empty to save storage
         total_predictions.at[0, "predictions"]           = []
@@ -485,8 +646,6 @@ class Analyze_predictions_utils(Mask_predictions):
             while len(updated_values) < self.params["bootstrapping_steps"]:
                 rand_index      = int(random.random()*len(values))
                 decision_cutoff = random.random()
-                #cutoffs.append(decision_cutoff)
-                #cutoffs2.append(rand_index)
 
                 if probabilities[rand_index]/max_value >= decision_cutoff:
                     updated_values.append(values[rand_index])
@@ -506,14 +665,10 @@ class Analyze_predictions_utils(Mask_predictions):
             model_predictions = [pred for pred in model_predictions if pd.isna(pred) == False] # <- added on 250528
 
         test_results = {}
-        # marked (<-) added / removed on 250529
-        # pvalue, _, _ = bootstrapping_test(model_predictions, np.mean(variant_predictions), len(variant_predictions), simulation_steps=100) # removed on 250529
-        # test_results["bootstrapping-pvalue "+target_col] = pvalue # removed on 250529
         if len(model_predictions) > 0: # added on 250529
             pvalue, _, _ = bootstrapping_test(model_predictions, np.mean(variant_predictions), len(variant_predictions), simulation_steps=100) # added on 250529
             test_results["bootstrapping-pvalue "+target_col] = pvalue # added on 250529
 
-        # marked entry (<-) added on 250408 to conduct binomial test using median as cutoff
         model_median         = np.median(model_predictions) # <- added from here
         model_count_below    = np.where(np.array(model_predictions) < model_median)[0].shape[0]
         model_count_above    = np.where(np.array(model_predictions) > model_median)[0].shape[0]
@@ -541,27 +696,14 @@ class Analyze_predictions_utils(Mask_predictions):
             print("<", model_median, expected_probability, "/", len(model_predictions), real_count_below, real_count_above,
                 test_results["binomial-pvalue "+target_col], test_results["binomial-statistic "+target_col])
 
-        # newly added on 250220
         # Fisher's exact test on section-wise deviations
         model_mean   = np.mean(model_predictions)
         variant_mean = np.mean(variant_predictions)
 
-        # marked (<-) added / removed on 250517 to obtain meaningful odds ratio
-        # if variant_mean < model_mean: # <- removed from here
-        #    model_count = np.where(np.array(model_predictions) < model_mean)[0].shape[0]
-        #    real_count  = np.where(np.array(variant_predictions) < model_mean)[0].shape[0]
-        
-        # if variant_mean > model_mean:
-        #    model_count = np.where(np.array(model_predictions) > model_mean)[0].shape[0]
-        #    real_count  = np.where(np.array(variant_predictions) > model_mean)[0].shape[0]
-        # <- until here
+        model_count = np.where(np.array(model_predictions) < model_mean)[0].shape[0]
+        real_count  = np.where(np.array(variant_predictions) < model_mean)[0].shape[0]
 
-        model_count = np.where(np.array(model_predictions) < model_mean)[0].shape[0] # <- added
-        real_count  = np.where(np.array(variant_predictions) < model_mean)[0].shape[0] # <- added
-
-        # marked (<-) added / removed on 250529
-        # if variant_mean != model_mean: # <- removed
-        if len(variant_predictions) > 0 and len(model_predictions) > 0: # <- added
+        if len(variant_predictions) > 0 and len(model_predictions) > 0:
             fishers_exact = stats.fisher_exact([[real_count, len(variant_predictions)-real_count], [model_count, len(model_predictions)-model_count]])
             test_results["fishers exact-statistic "+target_col] = fishers_exact.statistic
             test_results["fishers exact-pvalue "+target_col]    = fishers_exact.pvalue
@@ -570,25 +712,20 @@ class Analyze_predictions_utils(Mask_predictions):
         model_count   = np.where(np.array(model_predictions) <= self.params["nmd_escape_cutoff"])[0].shape[0]
         real_count    = np.where(np.array(variant_predictions) <= self.params["nmd_escape_cutoff"])[0].shape[0]
         fishers_exact = stats.fisher_exact([[real_count, len(variant_predictions)-real_count], [model_count, len(model_predictions)-model_count]])
-        # marked (<-) added / removed on 250529
-        # test_results["fishers exact escape-statistic "+target_col] = fishers_exact.statistic # <- removed
-        # test_results["fishers exact escape-pvalue "+target_col]    = fishers_exact.pvalue # <- removed
-        if len(variant_predictions) > 0 and len(model_predictions) > 0: # <- added
-            test_results["fishers exact escape-statistic "+target_col] = fishers_exact.statistic # <- added
-            test_results["fishers exact escape-pvalue "+target_col]    = fishers_exact.pvalue # <- added
+
+        if len(variant_predictions) > 0 and len(model_predictions) > 0:
+            test_results["fishers exact escape-statistic "+target_col] = fishers_exact.statistic
+            test_results["fishers exact escape-pvalue "+target_col]    = fishers_exact.pvalue
 
         # Fisher's exact test on cutoff-wise deviations: target
         model_count   = np.where(np.array(model_predictions) >= self.params["nmd_target_cutoff"])[0].shape[0]
         real_count    = np.where(np.array(variant_predictions) >= self.params["nmd_target_cutoff"])[0].shape[0]
 
         fishers_exact = stats.fisher_exact([[real_count, len(variant_predictions)-real_count], [model_count, len(model_predictions)-model_count]])
-        # marked (<-) added / removed on 250529
-        # test_results["fishers exact target-statistic "+target_col] = fishers_exact.statistic # <- removed
-        # test_results["fishers exact target-pvalue "+target_col]    = fishers_exact.pvalue # <- removed
 
-        if len(variant_predictions) > 0 and len(model_predictions) > 0: # <- added
-            test_results["fishers exact target-statistic "+target_col] = fishers_exact.statistic # <- added
-            test_results["fishers exact target-pvalue "+target_col]    = fishers_exact.pvalue # <- added
+        if len(variant_predictions) > 0 and len(model_predictions) > 0:
+            test_results["fishers exact target-statistic "+target_col] = fishers_exact.statistic
+            test_results["fishers exact target-pvalue "+target_col]    = fishers_exact.pvalue
 
         return test_results
 
@@ -621,11 +758,6 @@ class Analyze_predictions_utils(Mask_predictions):
 
         if pd.isna(expected_probability) == False and pd.isna(observed_probability) == False:
             test_results["binomial-statistic "+target_col] = observed_probability-expected_probability
-        
-        if "binomial-pvalue "+target_col in test_results and test_results["binomial-pvalue "+target_col] < 0.05:
-            #print("<", model_median, expected_probability, "/", len(model_predictions), model_prob_below, "/", model_prob_above, real_count_below, "/", real_count_above,
-            #    "stats", test_results["binomial-statistic "+target_col], "prob", test_results["binomial-pvalue "+target_col])
-            pass
 
         return test_results
 
@@ -682,7 +814,6 @@ class Analyze_predictions_utils(Mask_predictions):
                 temp.append(i)
 
             elif len(temp) > 0:
-                #print("gene id", self.predictions.iloc[i].loc["gene id"])
                 blocks, stats = self._create_appris_selection(blocks, stats, temp)
                 temp   = [i]
 
@@ -701,8 +832,6 @@ class Analyze_predictions_utils(Mask_predictions):
         if appris_sum != self.predictions.shape[0]: print("< inconsistent sizes @apply_filter", appris_sum, "/", self.predictions.shape[0])
         duplicates_test = self.predictions[self.predictions.duplicated(subset="gene id")]
 
-        # changed on 250321 as duplications are actually contained in the shape of "duplicates_test" itself
-        # print("< appris selection reduced entries from", init_shape, "to", self.predictions.shape[0], ". duplicates: ", self.predictions.shape[0]-duplicates_test.shape[0]) # old version
         print("< appris selection reduced entries from", init_shape, "to", self.predictions.shape[0], ". duplicates: ", duplicates_test.shape[0]) # new version
     
 
@@ -876,11 +1005,12 @@ class Analyze_predictions_utils(Mask_predictions):
         print("< error filtering reduced data from", init_shape, "to", self.predictions.shape[0])
 
 
+    # <- modified on 251114 to recognize both capital and non-capital letters
     def get_biallelic_only(self, data):
         init_shape = data.shape[0]
         data       = data[data["ID:chromosome"] != "chrY"]
         data       = data[[True if data.iloc[i].loc["ID:chromosome"] != "chrX" or (data.iloc[i].loc["ID:chromosome"] == "chrX"
-                           and data.iloc[i].loc["ID:gender"] == "FEMALE") else False for i in range(data.shape[0])]]
+                           and type(data.iloc[i].loc["ID:gender"]) == str and data.iloc[i].loc["ID:gender"].upper() == "FEMALE") else False for i in range(data.shape[0])]]
         print("< biallelic filtering reduced dataset from", init_shape, "to", data.shape[0])
         return data
 
@@ -896,25 +1026,21 @@ class Analyze_predictions_utils(Mask_predictions):
 
 
     def interpolate(self, transformed_predictions, predictions, it, positions=None, transformed_targets=None, exon_category=""):
-        max_position          = len(predictions)
-        # marked (<-) added / removed on 250528
-        # transformed_positions = [float(i)/max_position for i in range(len(predictions))] # <- removed
-        # marked (<-) added on 250528
-        if len(self.params["masks"]) > 0: # <- added
-            transformed_positions = [float(i)/max_position for i in range(len(predictions)) if pd.isna(predictions[i]) == False] # <- added
-            predictions           = [pred for pred in predictions if pd.isna(pred) == False] # <- added            
+        max_position = len(predictions)
+        if len(self.params["masks"]) > 0:
+            transformed_positions = [float(i)/max_position for i in range(len(predictions)) if pd.isna(predictions[i]) == False]
+            predictions           = [pred for pred in predictions if pd.isna(pred) == False]       
 
-        else: # <- added
-            transformed_positions = [float(i)/max_position for i in range(len(predictions))] # <- added
+        else:
+            transformed_positions = [float(i)/max_position for i in range(len(predictions))]
 
-        if len(transformed_positions) < self.params["projection_cutoff"]: # <- added
-            print("< sample size too small @interpolate ("+str(len(transformed_positions))+"/"+str(self.params["projection_cutoff"])+")") # <- added
+        if len(transformed_positions) < self.params["projection_cutoff"]:
+            print("< sample size too small @interpolate ("+str(len(transformed_positions))+"/"+str(self.params["projection_cutoff"])+")")
             exit()
 
         fit_successful = False
         try:
             fit_params     = np.polyfit(transformed_positions, predictions, deg=self.params["polynomial_degree"])
-            #fit_successful = True
 
             # marked entries (<-) added/removed on 250408 to interpolate distributions using cubic spline rather than polynomial fit
             cs_fit = CubicSpline(transformed_positions, predictions) # <- added
@@ -925,26 +1051,9 @@ class Analyze_predictions_utils(Mask_predictions):
             
         if fit_successful == True:
             transformation_steps        = [float(i)/self.params["transformation_steps"] for i in range(self.params["transformation_steps"])]
-            # marked entries (<-) added/removed on 250408 to interpolate distributions using cubic spline rather than polynomial fit
-            # transformed_predictions_col = self.get_polynomial(transformation_steps, fit_params) <- removed
-            transformed_predictions_col = cs_fit(transformation_steps) # <- added
+            transformed_predictions_col = cs_fit(transformation_steps)
             if len(exon_category) == 0: [self.stats["projected_mean_hist"][i].append(transformed_predictions_col[i]) for i in range(len(transformed_predictions_col))]
             if len(exon_category) > 0:  [self.stats["projected_"+exon_category+"_exon_mean_hist"][i].append(transformed_predictions_col[i]) for i in range(len(transformed_predictions_col))]
-            
-            '''
-            plt.plot(np.arange(len(predictions)), self.get_polynomial([float(i)/len(predictions) for i in range(len(predictions))], fit_params), color="blue", label="poly")
-            plt.plot(np.arange(len(predictions)), [cs_fit(float(i)/len(predictions)) for i in range(len(predictions))], color="red", label="cubic")
-            plt.plot(np.arange(len(predictions)), predictions, "bo")
-            plt.title(exon_category)
-            plt.legend()
-            plt.show()
-
-            plt.plot(transformation_steps, self.get_polynomial(transformation_steps, fit_params), color="blue", label="poly")
-            plt.plot(transformation_steps, [cs_fit(transformation_steps[i]) for i in range(len(transformation_steps))], color="red", label="cubic")
-            plt.title(exon_category)
-            plt.legend()
-            plt.show()
-            '''
 
             if transformed_targets != None:
                 for variant_key in self.params["variant_targets"]:
@@ -985,8 +1094,6 @@ class Analyze_predictions_utils(Mask_predictions):
             exons = list(self.predictions.iloc[i].loc["predictions_by_exon"].keys())
             
             # interpolate all predictions for cds
-            # marked (<-) added / removed on 250528
-            # if len(self.predictions.iloc[i].loc["predictions"]) >= self.params["projection_cutoff"]: # <- removed
             if ((len(self.params["masks"]) == 0 and len(self.predictions.iloc[i].loc["predictions"]) >= self.params["projection_cutoff"])
                 or (len(self.params["masks"]) > 0 and len([pred for pred in self.predictions.iloc[i].loc["predictions"] if pd.isna(pred) == False]) >= self.params["projection_cutoff"])): # <- added
                 if pd.isna(self.predictions.iloc[i].loc["variant targets"]) == False:
@@ -1016,20 +1123,14 @@ class Analyze_predictions_utils(Mask_predictions):
                         if j == 0 and len(exons) > 1:                     exon_category = "first"
                         if j > 0 and j < len(exons)-1 and len(exons) > 1: exon_category = "middle"
                         if j == len(exons)-1:                             exon_category = "last"
-                        #if len(self.predictions.iloc[i].loc["predictions_by_exon"][exons[j]]) == 0:
-                        #    print("j", j, "/", len(exons)-1, self.predictions.iloc[i].loc["transcript id"], exons[j])
 
                         # marked (<-) added / removed on 250528
-                        # if len(self.predictions.iloc[i].loc["predictions_by_exon"][exons[j]]) >= self.params["projection_cutoff"]: # <- removed
                         if ((len(self.params["masks"]) == 0 and len(self.predictions.iloc[i].loc["predictions_by_exon"][exons[j]]) >= self.params["projection_cutoff"])
                             or (len(self.params["masks"]) > 0 and len([pred for pred in self.predictions.iloc[i].loc["predictions_by_exon"][exons[j]] if pd.isna(pred) == False]) >= self.params["projection_cutoff"])): # <- added
-                            # unclear whether None needs to be replaced by np.isnan
+
                             if (pd.isna(self.predictions.iloc[i].loc["variant targets"]) == False
                                 and "FEATURE:ptc cds position" in self.predictions.iloc[i].loc["variant targets"] and len(self.predictions.iloc[i].loc["variant targets"]["FEATURE:ptc cds position"][exons[j]]) > 0):
                                 transformed_targets = {variant_key: [] for variant_key in self.params["variant_targets"]}
-                            #if (self.predictions.iloc[i].loc["variant targets"] != None
-                            #    and "FEATURE:ptc cds position" in self.predictions.iloc[i].loc["variant targets"] and len(self.predictions.iloc[i].loc["variant targets"]["FEATURE:ptc cds position"][exons[j]]) > 0):
-                            #    transformed_targets = {variant_key: [] for variant_key in self.params["variant_targets"]}
 
                                 for variant_key in self.params["variant_targets"]:
                                     transformed_targets[variant_key] = self.predictions.iloc[i].loc["variant targets"][variant_key][exons[j]]
@@ -1051,7 +1152,6 @@ class Analyze_predictions_utils(Mask_predictions):
                             if fit_successful == True:  projection_stats["exons"]["successful"]   += 1
                             if fit_successful == False: projection_stats["exons"]["not successful"] += 1
 
-                        #print("i", i, "j", j, "preceeding_length", preceeding_length, exons[j], len(self.predictions.iloc[i].loc["predictions_by_exon"][exons[j]]))
                         preceeding_length += len(self.predictions.iloc[i].loc["predictions_by_exon"][exons[j]])
             
             bar.next()
@@ -1114,9 +1214,7 @@ class Analyze_predictions_utils(Mask_predictions):
 
             # unclear whether None needs to be replaced by np.isnan
             if pd.isna(self.predictions.iloc[it].loc["variant targets"]) == False:
-            #if self.predictions.iloc[it].loc["variant targets"] != None:
                 for variant_key in self.params["variant_targets"]:
-                    #if "FEATURE:prediction" in variant_key:
                     values = []
                     [[values.append(i) for i in self.predictions.iloc[it].loc["variant targets"][variant_key][exon]] for exon in exons]
                     
@@ -1149,7 +1247,7 @@ class Analyze_predictions_utils(Mask_predictions):
         if self.params["exon_resolution"] == False:
             self.base_dict = {
                               "mean"                             : [],
-                              "probabilities"                    : [], # <- added on 250605
+                              "probabilities"                    : [],
                               "size"                             : [],
                               "values"                           : [],
                               "projected_mean_hist"              : [[] for _ in range(self.params["transformation_steps"])]
@@ -1165,11 +1263,11 @@ class Analyze_predictions_utils(Mask_predictions):
                               "first_exon_size"                  : [],
                               "last_exon_size"                   : [],
                               "middle_exon_size"                 : [],
-                              "probabilities"                    : [], # <- added on 250605
+                              "probabilities"                    : [],
                               "values"                           : [],
-                              "first_exon_probabilities"         : [], # <- added on 250605
-                              "last_exon_probabilities"          : [], # <- added on 250605
-                              "middle_exon_probabilities"        : [], # <- added on 250605
+                              "first_exon_probabilities"         : [],
+                              "last_exon_probabilities"          : [],
+                              "middle_exon_probabilities"        : [],
                               "first_exon_values"                : [],
                               "last_exon_values"                 : [],
                               "middle_exon_values"               : [],
@@ -1219,8 +1317,6 @@ class Analyze_predictions_utils(Mask_predictions):
                 if len(data) == 1: self.predictions = data[0]
                 else:              self.predictions = pd.concat(data, ignore_index=True)
             
-                #self.preditions = self.predictions[self.predictions["transcript id"] == "ENST00000246551.9"]
-                #self.predictions = self.predictions.iloc[0:1000]
                 self.predictions = self.predictions[self.predictions["transcript id"] != "-"]
                 if len(self.params["error_filter"]) > 0: self.filter_errors()
 
@@ -1246,7 +1342,13 @@ class Analyze_predictions_utils(Mask_predictions):
                 if self.params["use_variant_filter"] == True:
                     self.predictions = self.apply_variant_filter(self.predictions, self.params["variant_filter_col"].replace("ID:", ""),
                                                                  self.params["variant_filter_col"], mode="variant_filter")
-                
+                    
+                # <- added on 251111
+                if ("apply_mutation_stats" in self.params and
+                   (self.params["apply_mutation_stats"] == True or self.params["apply_mutation_weights"] == True or self.params["mutation_stats_ptc_weights"] == True)):
+                    self.predictions = self.predictions[self.predictions["transcript id"].isin(self.mutation_stats["genes"]["total"])]
+                    self.predictions = self.predictions[self.predictions["transcript id"].isin(self.seqs.index)]
+
             if mode == "variant_filter":
                 if len(data) == 1: self.variant_filter = data[0]
                 else:              self.variant_filter = pd.concat(data, ignore_index=True)
@@ -1278,13 +1380,12 @@ class Analyze_predictions_utils(Mask_predictions):
                 if "Teran" in self.params["id_filter"]:
                     self.variants = self.variants.drop_duplicates(subset=["ID:subject id", "ID:variant id"])
 
-                if "TCGA" in self.params["id_filter"] and self.params["tcga_filter"] == "biallelic_only":
-                    # filter out Y-chromosomes and X-chromosomes for men
+                # <- modified on 251104
+                if ("CPTAC3" in self.params["id_filter"] or "TCGA" in self.params["id_filter"]) and self.params["tcga_filter"] == "biallelic_only":
                     self.variants = self.get_biallelic_only(self.variants)
 
                 if self.params["shared_variants_cases"] == True:
                     # performance is slow as 'duplicated' keeps all duplicated entries, second reduction step should accelarate (250321)
-                    #shared_variants          = self.variants[self.variants.duplicated(subset="ID:variant id")]["ID:variant id"].tolist() # old version
                     shared_variants          = self.variants[self.variants.duplicated(subset="ID:variant id")].drop_duplicates(subset="ID:variant id")["ID:variant id"].tolist() # new version
                     filtered_shared_variants = [shared_variant for shared_variant in shared_variants
                                                 if self.variants[self.variants["ID:variant id"] == shared_variant].shape[0] >= self.params["shared_variants_filter"]]
@@ -1294,7 +1395,6 @@ class Analyze_predictions_utils(Mask_predictions):
 
                 if self.params["shared_variants"] == True:
                     # performance is slow as 'duplicated' keeps all duplicated entries, second reduction step should accelarate (250321)
-                    # shared_variants          = self.variants[self.variants.duplicated(subset="ID:variant id")]["ID:variant id"].tolist() # old version
                     shared_variants          = self.variants[self.variants.duplicated(subset="ID:variant id")].drop_duplicates(subset="ID:variant id")["ID:variant id"].tolist() # new version
                     filtered_shared_variants = [shared_variant for shared_variant in shared_variants
                                                 if self.variants[self.variants["ID:variant id"] == shared_variant].shape[0] >= self.params["shared_variants_filter"]]
@@ -1303,9 +1403,13 @@ class Analyze_predictions_utils(Mask_predictions):
 
                 # filter out expression values below minimum (if specified)
                 # now in shared_utils (250313)
-                #self.variants = self.apply_value_filter(self.variants, self.params["variant_value_filter"], "variants")
                 self.variants = apply_value_filter(self.variants, self.params["variant_value_filter"], "variants")
-                #self.variants = self.variants[self.variants["ID:transcript id"] == "ENST00000060969"]
+                
+                # <- added on 251030
+                if self.params["random_sample_size"] != None:
+                    self.variants = self.variants.sample(frac=1).reset_index(drop=True)
+                    self.variants = self.variants.iloc[0:self.params["random_sample_size"]]
+
 
                 # report and remove missing values and check for expired placeholders ("-" and -1)
                 for col in np.unique([*self.params["variant_targets"], *self.params["variant_test_targets"]]):
@@ -1326,6 +1430,7 @@ class Analyze_predictions_utils(Mask_predictions):
                     if self.variants[self.variants[col] == "-"].shape[0] > 0:
                         print("< expired placeholder '-' detected @", col)
                         exit()
+
                         
     # mapping variant data to predictions and calculate significance of selection
     def map_variants(self):
@@ -1340,12 +1445,12 @@ class Analyze_predictions_utils(Mask_predictions):
         self.predictions["avg. model prediction"]   = [None for _ in range(self.predictions.shape[0])]
         self.predictions["avg. real prediction"]    = [None for _ in range(self.predictions.shape[0])]
         # marked (<-) added on 250523
-        self.predictions["median model prediction"] = [None for _ in range(self.predictions.shape[0])] # <- added
-        self.predictions["median real prediction"]  = [None for _ in range(self.predictions.shape[0])] # <- added
+        self.predictions["median model prediction"] = [None for _ in range(self.predictions.shape[0])]
+        self.predictions["median real prediction"]  = [None for _ in range(self.predictions.shape[0])]
         self.predictions["avg. real size"]          = [None for _ in range(self.predictions.shape[0])]
         self.predictions["block id"]                = [None for _ in range(self.predictions.shape[0])]
-        self.predictions["probabilities"]           = [[] for _ in range(self.predictions.shape[0])] # <- added on 250603
-        self.predictions["probabilities_by_exon"]   = [[] for _ in range(self.predictions.shape[0])] # <- added on 250607
+        self.predictions["probabilities"]           = [[] for _ in range(self.predictions.shape[0])]
+        self.predictions["probabilities_by_exon"]   = [[] for _ in range(self.predictions.shape[0])]
         self.predictions["real predictions"]        = [[] for _ in range(self.predictions.shape[0])]
         self.predictions["variant index"]           = mapped_index
         self.predictions["variant targets"]         = [None for _ in range(self.predictions.shape[0])]
@@ -1355,8 +1460,8 @@ class Analyze_predictions_utils(Mask_predictions):
 
         for variant_test_target in self.params["variant_test_targets"]:
             # marked entry (<-) added on 250408 to conduct binomial test using median as cutoff
-            self.predictions["binomial-pvalue "+variant_test_target]                 = [None for _ in range(self.predictions.shape[0])] # <-
-            self.predictions["binomial-statistic "+variant_test_target]              = [None for _ in range(self.predictions.shape[0])] # <-
+            self.predictions["binomial-pvalue "+variant_test_target]                 = [None for _ in range(self.predictions.shape[0])]
+            self.predictions["binomial-statistic "+variant_test_target]              = [None for _ in range(self.predictions.shape[0])]
             self.predictions["bootstrapping-pvalue "+variant_test_target]            = [None for _ in range(self.predictions.shape[0])]
             self.predictions["fishers exact-statistic "+variant_test_target]         = [None for _ in range(self.predictions.shape[0])]
             self.predictions["fishers exact-pvalue "+variant_test_target]            = [None for _ in range(self.predictions.shape[0])]
@@ -1368,7 +1473,8 @@ class Analyze_predictions_utils(Mask_predictions):
         bar = IncrementalBar(set_bar("mapping variants II"), max=len(mapped_index))
         for i in range(len(mapped_index)):
             if len(mapped_index[i]) > 0:
-                variant_targets = {key: {exon: [] for exon in self.predictions.iloc[i].loc["predictions_by_exon"]} for key in self.params["variant_targets"]}
+                variant_targets = {key: {exon: [] for exon in self.predictions.iloc[i].loc["predictions_by_exon"]}
+                                   for key in self.params["variant_targets"]}
                 
                 exons           = list(self.predictions.iloc[i].loc["predictions_by_exon"].keys())
                 # reverse order if -strand for variant assignment to corresponding exon
@@ -1385,11 +1491,6 @@ class Analyze_predictions_utils(Mask_predictions):
                     unassigned = True
                     for key_index, key in enumerate(self.params["variant_targets"]):
                         for k in range(len(exons)):
-                            #if (self.variants.iloc[mapped_index[i][j]].loc[key] != "-"
-                            #    and ((k < len(exons)-1 and self.variants.iloc[mapped_index[i][j]].loc[self.params["variant_targets"][key]] >= int(exons[k])
-                            #    and self.variants.iloc[mapped_index[i][j]].loc[self.params["variant_targets"][key]] < int(exons[k+1]))
-                            #    or (k == len(exons)-1 and self.variants.iloc[mapped_index[i][j]].loc[self.params["variant_targets"][key]] >= int(exons[k])))):
-
                             if ((k < len(exons)-1 and self.variants.iloc[mapped_index[i][j]].loc[self.params["variant_targets"][key]] >= int(exons[k])
                                 and self.variants.iloc[mapped_index[i][j]].loc[self.params["variant_targets"][key]] < int(exons[k+1]))
                                 or (k == len(exons)-1 and self.variants.iloc[mapped_index[i][j]].loc[self.params["variant_targets"][key]] >= int(exons[k]))):
@@ -1405,9 +1506,6 @@ class Analyze_predictions_utils(Mask_predictions):
                         if key_index == 0 and unassigned == True: stats["unassigned"] += 1
                                 
                     # collect data for bootstrapping test to test for significant deviation between real features and theoretical distribution
-                    #for variant_test_target in self.params["variant_test_targets"]:
-                    #    if self.variants.iloc[mapped_index[i][j]].loc[variant_test_target] != "-":
-                    #       variant_distribution[variant_test_target].append(float(self.variants.iloc[mapped_index[i][j]].loc[variant_test_target]))
                     [variant_distribution[variant_test_target].append(float(self.variants.iloc[mapped_index[i][j]].loc[variant_test_target]))
                      for variant_test_target in self.params["variant_test_targets"]]
 
@@ -1415,18 +1513,10 @@ class Analyze_predictions_utils(Mask_predictions):
 
                 # conduct bootstrapping test to test for significant deviation between real features and theoretical distribution
                 for variant_test_target in self.params["variant_test_targets"]:
-                    # marked if-statement (<-) added on 250528
-                    if len(self.params["masks"]) > 0: # <- added from here
-                        #for j in range(len(mapped_index[i])):
-                        #    print(self.variants.iloc[mapped_index[i][j]].loc["ID:variant id"], self.variants.iloc[mapped_index[i][j]].loc["ID:HGVSc"], self.variants.iloc[mapped_index[i][j]].loc["FEATURE:ptc cds position"])
-
-                        #predictions, predictions_by_exon, probabilities, probabilities_by_exon = self.mask_predictions(self.predictions.loc[self.predictions.index[i]].loc["predictions"],
-                        #                                                                                               self.predictions.loc[self.predictions.index[i]].loc["predictions_by_exon"],
-                        #                                                                                               variant_targets, self.variants.iloc[mapped_index[i][j]].loc["FEATURE:all cds"],
-                        #                                                                                               self.predictions.index[i], self.params["mutation_stats_gene_target"], self.params["mutation_stats_pair_target"])
+                    if len(self.params["masks"]) > 0:
                         predictions, predictions_by_exon, probabilities, probabilities_by_exon, self.predictions.at[self.predictions.index[i], "variant targets"] = self.mask_predictions(self.predictions.loc[self.predictions.index[i]].loc["predictions"],
                                                                                                                        self.predictions.loc[self.predictions.index[i]].loc["predictions_by_exon"],
-                                                                                                                       variant_targets, self.variants.iloc[mapped_index[i][j]].loc["FEATURE:all cds"],
+                                                                                                                       variant_targets, self.seqs.loc[self.predictions.index[i]].loc["cds"],
                                                                                                                        self.predictions.index[i], self.params["mutation_stats_gene_target"], self.params["mutation_stats_pair_target"])
 
                         self.predictions.at[self.predictions.index[i], "predictions"]           = predictions
@@ -1438,19 +1528,12 @@ class Analyze_predictions_utils(Mask_predictions):
                     else:                                                predictions = self.global_predictions
 
                     if len(variant_distribution[variant_test_target]) > 0:
-                        # marked (<-) added / removed on 250528
-                        #self.predictions.at[self.predictions.index[i], "avg. model prediction"] = np.mean(predictions) # removed
-                        #self.predictions.at[self.predictions.index[i], "avg. real prediction"]  = np.mean(variant_distribution[variant_test_target]) # removed
-                        self.predictions.at[self.predictions.index[i], "avg. model prediction"] = np.nanmean(predictions) # added
-                        self.predictions.at[self.predictions.index[i], "avg. real prediction"]  = np.nanmean(variant_distribution[variant_test_target]) # added
-                        # marked (<-) added on 250523
-                        self.predictions.at[self.predictions.index[i], "median model prediction"] = np.nanmedian(predictions) # <- added
-                        self.predictions.at[self.predictions.index[i], "median real prediction"]  = np.nanmedian(variant_distribution[variant_test_target]) # <- added
+                        self.predictions.at[self.predictions.index[i], "avg. model prediction"] = np.nanmean(predictions)
+                        self.predictions.at[self.predictions.index[i], "avg. real prediction"]  = np.nanmean(variant_distribution[variant_test_target])
+                        self.predictions.at[self.predictions.index[i], "median model prediction"] = np.nanmedian(predictions)
+                        self.predictions.at[self.predictions.index[i], "median real prediction"]  = np.nanmedian(variant_distribution[variant_test_target])
 
                         self.predictions.at[self.predictions.index[i], "avg. real size"]        = len(variant_distribution[variant_test_target])
-                        #self.predictions.at[self.predictions.index[i], "block id"]              = self.variants.iloc[mapped_index[i][j]].loc["ID:transcript id"]
-                        # changed 241025 to make sure all real variants can be mapped (even if different appris annotation is selected)
-                        #self.predictions.at[self.predictions.index[i], "block id"]              = self.variants.iloc[mapped_index[i][j]].loc["ID:gene id"]
                         self.predictions.at[self.predictions.index[i], "block id"]              = self.variants.iloc[mapped_index[i][j]].loc["ID:gene symbol"]
                         self.predictions.at[self.predictions.index[i], "real predictions"]      = variant_distribution[variant_test_target]
 
@@ -1458,18 +1541,28 @@ class Analyze_predictions_utils(Mask_predictions):
                         for key in self.params["selection_cols"]:
                             self.predictions.at[self.predictions.index[i], key] = self.variants.iloc[mapped_index[i]][self.params["selection_cols"][key]].tolist()
 
-                        # marked (<-) added / removed on 250603                        
-                        # test_results = self.conduct_test(predictions, variant_distribution[variant_test_target], variant_test_target) # <- removed
-                        if self.params["apply_mutation_stats"] == False and self.params["mutation_stats_ptc_weights"] == False and self.params["mutation_stats_ptc_weights"] == False: # <- added, recheck
+                        if self.params["apply_mutation_stats"] == False and self.params["apply_mutation_weights"] == False and self.params["mutation_stats_ptc_weights"] == False: # <- added, recheck
                             test_results = self.conduct_test(predictions, variant_distribution[variant_test_target], variant_test_target) # <- added
 
-                        #if self.params["apply_mutation_stats"] == True or (self.params["apply_mutation_stats"] == False and self.params["mutation_stats_ptc_weights"] == True): # <- added
                         if self.params["apply_mutation_stats"] == True or self.params["apply_mutation_weights"] == True or self.params["mutation_stats_ptc_weights"] == True: # recheck
                             test_results = self.conduct_test_w_mutation_stats(predictions, self.predictions.loc[self.predictions.index[i]].loc["probabilities"],
                                                                               variant_distribution[variant_test_target], variant_test_target) # <- added
 
                         for key in test_results:
                             self.predictions.at[self.predictions.index[i], key] = test_results[key]
+            
+            # <- added on 251111 
+            elif len(mapped_index[i]) == 0:
+                predictions, predictions_by_exon, probabilities, probabilities_by_exon, self.predictions.at[self.predictions.index[i], "variant targets"] = self.mask_predictions(self.predictions.loc[self.predictions.index[i]].loc["predictions"],
+                                                                                                            self.predictions.loc[self.predictions.index[i]].loc["predictions_by_exon"],
+                                                                                                            {variant_target: {} for variant_target in self.params["variant_targets"]}, self.seqs.loc[self.predictions.index[i]].loc["cds"],
+                                                                                                            self.predictions.index[i], self.params["mutation_stats_gene_target"], self.params["mutation_stats_pair_target"])
+
+                self.predictions.at[self.predictions.index[i], "predictions"]           = predictions
+                self.predictions.at[self.predictions.index[i], "predictions_by_exon"]   = predictions_by_exon
+                self.predictions.at[self.predictions.index[i], "probabilities"]         = probabilities
+                self.predictions.at[self.predictions.index[i], "probabilities_by_exon"] = probabilities_by_exon # <- until here
+
             bar.next()
         bar.finish()
         print("< stats", stats)
@@ -1501,29 +1594,6 @@ class Analyze_predictions_utils(Mask_predictions):
 
         stats = json.dumps(self.stats, indent=4)
 
-        '''
-        all_values = []
-        [all_values.extend(val) for val in self.stats["projected_mean_hist"]]
-        plt.hist(all_values, bins=40, histtype="step", label="mean")
-        plt.legend()
-        plt.show()
-        all_values = []
-        [all_values.extend(val) for val in self.stats["projected_first_exon_mean_hist"]]
-        plt.hist(all_values, bins=40, histtype="step", label="first_exon")
-        plt.legend()
-        plt.show()
-        all_values = []
-        [all_values.extend(val) for val in self.stats["projected_last_exon_mean_hist"]]
-        plt.hist(all_values, bins=40, histtype="step", label="last_exon")
-        plt.legend()
-        plt.show()
-        all_values = []
-        [all_values.extend(val) for val in self.stats["projected_middle_exon_mean_hist"]]
-        plt.hist(all_values, bins=40, histtype="step", label="middle_exon")
-        plt.legend()
-        plt.show()
-        '''
-
         with open(self.newdir+self.params["os_sep"]+self.params["file_tag"]+"_stats.json", "w") as file:
             file.write(stats)
 
@@ -1547,14 +1617,10 @@ class Analyze_predictions_utils(Mask_predictions):
                                                  "escape", "target", "relative escape", "relative target"]]
 
             else:
-                # marked (<-) added / removed on 250523
-                # selected_cols = [col for col in ["gene symbol", "gene id", "avg. model prediction", "avg. real prediction", "avg. real size",
-                #                                 self.params["selection_method"]+"-pvalue FEATURE:prediction",
-                #                                 "escape", "target", "relative escape", "relative target"]] # <- removed
                 selected_cols = [col for col in ["gene symbol", "gene id", "avg. model prediction", "avg. real prediction",
                                                  "median model prediction", "median real prediction", "avg. real size",
                                                  self.params["selection_method"]+"-pvalue FEATURE:prediction",
-                                                 "escape", "target", "relative escape", "relative target"]] # <- added
+                                                 "escape", "target", "relative escape", "relative target"]]
             
         if project_mode == True:
             selected_cols = [*["gene symbol", "gene id"], *[col for col in selection.columns if ("escape" in col or "target" in col) and "relative" not in col]]
@@ -1565,12 +1631,9 @@ class Analyze_predictions_utils(Mask_predictions):
         
     def store_test(self):
         cols = [
-                # marked (<-) added / removed on 250523
-                # "gene id", "transcript id", "avg. model prediction", "avg. real prediction", "avg. real size", "block id", "real predictions", "variant index", # <- removed
                 "gene id", "transcript id", "avg. model prediction", "avg. real prediction", "median model prediction", "median real prediction", # <- added
                 "avg. real size", "block id", "real predictions", "variant index", # <- added
                 *self.params["selection_cols"], 
-                 # marked entry (<-) added on 250408 to conduct binomial test using median as cutoff
                 *["binomial-pvalue "+variant_test_target for variant_test_target in self.params["variant_test_targets"]], # <-
                 *["binomial-statistic "+variant_test_target for variant_test_target in self.params["variant_test_targets"]], # <-
                 *["bootstrapping-pvalue "+variant_test_target for variant_test_target in self.params["variant_test_targets"]],

@@ -17,9 +17,9 @@ params = {
          "max_threads"              : 1,
          "mode"                     : ["create_status"], # append_info, create_status, download_files # <- append_info added on 250807
          "os_sep"                   : "\\",
-         "project_filter"           : "TCGA",
+         "project_filter"           : "CPTAC-3", # "TCGA", # None means no filter <- modified on 2501020
          "projects"                 : [],
-         "status_fname"             : "tcga_data_info.json",
+         "status_fname"             : "filtered_status_w_md5sum.json",
          "url"                      : "https://api.gdc.cancer.gov/"
          }
 

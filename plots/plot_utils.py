@@ -1,3 +1,4 @@
+import os
 from lifelines import KaplanMeierFitter # <- added on 250705
 from lifelines.statistics import logrank_test # <- added on 250705
 import matplotlib as mpl
@@ -10,7 +11,8 @@ import scipy.stats as stats
 from scipy.cluster import hierarchy
 import string
 import sys
-sys.path.insert(0, r"C:\Programming\Translational_genomics\NMD_analysis\shared")
+parent_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
+sys.path.insert(0, parent_dir+"\\shared")
 
 from shared_utils import *
 
@@ -22,12 +24,11 @@ class Plot_utils():
         rcParams["axes.labelsize"]      = 7
         rcParams['font.family']         = 'sans-serif'
         rcParams['font.sans-serif']     = ['Arial']
-        rcParams['legend.fontsize']     = 7
-        rcParams['lines.markersize']    = 3
-        rcParams['svg.fonttype']        = 'none'
+        rcParams['legend.fontsize']     = 7 # <- added on 250911
+        rcParams['lines.markersize']    = 3 # <- added on 250911
+        rcParams['svg.fonttype']        = 'none' # <- added on 250911
         rcParams["xtick.labelsize"]     = 6
         rcParams["ytick.labelsize"]     = 6
-
 
     # checked
     def bar_plot(self, ax, data, features):
@@ -47,20 +48,20 @@ class Plot_utils():
                 for k in range(len(features["labels"][j])):
                     if "no_zeros" in features and features["no_zeros"] == True:
                         if data[j].iloc[i].loc[features["xcol"][j][k]] > 0:
-                            if i == data[j].shape[0]-1: ax.bar(i+0.2*(2*j+k), data[j].iloc[i].loc[features["xcol"][j][k]], alpha=0.5,
-                                                               color=features["colors"][j][k], edgecolor=features["edgecolors"][j][k], linewidth=2, width=0.2)
-                            else:                       ax.bar(i+0.2*(2*j+k), data[j].iloc[i].loc[features["xcol"][j][k]], alpha=0.5,
-                                                               color=features["colors"][j][k], edgecolor=features["edgecolors"][j][k], linewidth=2, width=0.2)
+                            if i == data[j].shape[0]-1: ax.bar(i+0.2*(2*j+k), data[j].iloc[i].loc[features["xcol"][j][k]], alpha=1,
+                                                               color=features["colors"][j][k], edgecolor=features["edgecolors"][j][k], linewidth=0.5, width=0.2)
+                            else:                       ax.bar(i+0.2*(2*j+k), data[j].iloc[i].loc[features["xcol"][j][k]], alpha=1,
+                                                               color=features["colors"][j][k], edgecolor=features["edgecolors"][j][k], linewidth=0.5, width=0.2)
 
-                        if data[j].iloc[i].loc[features["xcol"][j][k]] == 0:
-                            if i == data[j].shape[0]-1: ax.bar(i+0.2*(2*j+k), 0.01, color="white", edgecolor=features["edgecolors"][j][k], linewidth=2, width=0.2)
-                            else:                       ax.bar(i+0.2*(2*j+k), 0.01, color="white", edgecolor=features["edgecolors"][j][k], linewidth=2, width=0.2)
+                        if pd.isna(data[j].iloc[i].loc[features["xcol"][j][k]]) == True or data[j].iloc[i].loc[features["xcol"][j][k]] == 0: # <- added on 251110
+                            if i == data[j].shape[0]-1: ax.bar(i+0.2*(2*j+k), 0.0025, color="white", edgecolor=features["edgecolors"][j][k], linewidth=0.5, width=0.2)
+                            else:                       ax.bar(i+0.2*(2*j+k), 0.0025, color="white", edgecolor=features["edgecolors"][j][k], linewidth=0.5, width=0.2)
 
                     else:
                         if i == data[j].shape[0]-1: ax.bar(i+0.2*(2*j+k), data[j].iloc[i].loc[features["xcol"][j][k]],
-                                                           color=features["colors"][j][k], edgecolor=features["edgecolors"][j][k], alpha=1, width=0.2)
+                                                           color=features["colors"][j][k], edgecolor=features["edgecolors"][j][k], alpha=1, linewidth=0.5, width=0.2)
                         else:                       ax.bar(i+0.2*(2*j+k), data[j].iloc[i].loc[features["xcol"][j][k]],
-                                                           color=features["colors"][j][k], edgecolor=features["edgecolors"][j][k], alpha=1, width=0.2)
+                                                           color=features["colors"][j][k], edgecolor=features["edgecolors"][j][k], alpha=1, linewidth=0.5, width=0.2)
 
                     values[k].append(data[j].iloc[i].loc[features["xcol"][j][k]])
 
@@ -79,11 +80,10 @@ class Plot_utils():
             ax.set_xticks(np.arange(data[0].shape[0]), features["xlabels"], rotation="vertical", va="center")
 
         else:
-            ax.tick_params(axis='both', which='both', bottom=False, left=False, right=False, top=False, labelbottom=False)
+            ax.tick_params(axis='both', which='both', bottom=False, right=False, top=False, labelbottom=False)
         
         if "xrange" in features: ax.set_xlim(features["xrange"])
         if "yrange" in features: ax.set_ylim(features["yrange"])
-            
         return ax
 
 
@@ -91,24 +91,24 @@ class Plot_utils():
     def box_plot(self, ax, data, features):
         # default settings
         boxtype    = "explicit"
-        showfliers = True
+        meanline = False; showfliers = True; showmeans = False
         if "boxtype" in features:    boxtype    = features["boxtype"]
+        if "meanline" in features:   meanline   = features["meanline"]
         if "showfliers" in features: showfliers = features["showfliers"]
+        if "showmeans" in features:  showmeans  = features["showmeans"]
 
         if type(features["ycol"]) == str: features["ycol"] = [features["ycol"]]
 
         for i in range(data.shape[0]):
             for j, ycol in enumerate(features["ycol"]):
-                #print("i", i, "j", j, ycol, data.iloc[i].loc[features["xcol"]], data.iloc[i].loc[ycol])
                 if type(data.iloc[i].loc[ycol]) == str:  y = json.loads(data.iloc[i].loc[ycol])
                 if type(data.iloc[i].loc[ycol]) == list: y = data.iloc[i].loc[ycol]
 
                 if "log_scale" in features and features["log_scale"] == True: y = [math.log10(y[j]) if y[j] > 0 else 0 for j in range(len(y))]           
 
                 if boxtype == "compact":
-                    #print(i, j, features["xcol"], data.iloc[i].loc[features["xcol"]], len(y))
                     boxplot = ax.boxplot(y, labels=[data.iloc[i].loc[features["xcol"]].replace("TCGA-", "").replace("_Solid_Tissue_Normal", " normal")], 
-                                         positions=[i*len(features["ycol"])+0.5*j], showfliers=showfliers, patch_artist=True, widths=0.5)
+                                         positions=[i*len(features["ycol"])+0.5*j], showfliers=showfliers, patch_artist=True, widths=0.5, meanline=meanline, showmeans=showmeans)
                 
                     for patch in zip(boxplot['boxes']):
                         patch[0].set_edgecolor("dimgray")
@@ -131,7 +131,7 @@ class Plot_utils():
 
                 if boxtype == "explicit":
                     boxplot = ax.boxplot(y, labels=[data.iloc[i].loc[features["xcol"]].replace("TCGA-", "").replace("_Solid_Tissue_Normal", " normal")],
-                                        meanline=True, notch=True, positions=[i*len(features["ycol"])+0.5*j], showfliers=showfliers, showmeans=True, patch_artist=True, widths=0.5)
+                                         meanline=True, notch=True, positions=[i*len(features["ycol"])+0.5*j], showfliers=showfliers, showmeans=True, patch_artist=True, widths=0.5)
 
                     for patch in zip(boxplot['boxes']):
                         if "colors" not in features: patch[0].set_facecolor(self.cmap(float(i)/data.shape[0]))
@@ -175,7 +175,7 @@ class Plot_utils():
     # checked (should be re-checked)
     def _dotplot(self, value, scale, category, binary=False):
         category_index = get_category_index(value, scale)
-        #print("value", value, "scale", scale, "category", category, "category_index", category_index)
+
         if binary == False:
             if category_index == None: return category[0]
             if category_index != None: return category[category_index+1]
@@ -224,8 +224,6 @@ class Plot_utils():
                 else:                     size_scale  = self._dotplot(data[i].iloc[j].loc[features["ycol"][i]], scale["ycol"], scale["sizes"])
                 if scale["zcol"] == None: color_scale = (data[i].iloc[j].loc[features["zcol"][i]]-np.min(zcol_min)) / max_z_difference
                 else:                     color_scale = self._dotplot(data[i].iloc[j].loc[features["zcol"][i]], scale["zcol"], scale["colors"], scale["binary"])
-                #if len(data) == 4: print("i", i, "j", j, data[i].iloc[j].loc[features["xcol"][i]], features["ycol"][i], features["zcol"][i],
-                #                         data[i].iloc[j].loc[features["ycol"][i]], data[i].iloc[j].loc[features["zcol"][i]], size_scale, color_scale)
 
                 if size_scale > 0:
                     if colors_explicit == False:
@@ -376,14 +374,12 @@ class Plot_utils():
                 for target_col in target_cols:
                     if target_col in data[i].columns:
                         if data[i][data[i][target_col] == -1].shape[0] > 0:  self._get_missing_values(text+", "+target_col+", -1")
-                        #if data[i][data[i][target_col].isnull()].shape[0] > 0: self.get_missing_values_(text)
                         if data[i][data[i][target_col].isna()].shape[0] > 0: self._get_missing_values(text+", "+target_col+", None")
 
         else:
             for target_col in target_cols:
                 if target_col in data.columns:
                     if data[data[target_col] == -1].shape[0] > 0:  self._get_missing_values(text+", "+target_col+", -1")
-                    #if data[data[target_col].isnull()].shape[0] > 0: self.get_missing_values_(text)
                     if data[data[target_col].isna()].shape[0] > 0: self._get_missing_values(text+", "+target_col+", None")
     
 
@@ -393,17 +389,16 @@ class Plot_utils():
 
         for i in range(len(data_xd)):
             for j in range(len(data_xd[i])):
-                #if j == 0: print("i0", i, "j", j, data_xd[i][j], threshold)
                 if data_3d[i][j] > threshold:
-                    if data_xd[i][j] < 0.001 and pd.isna(data_xd[i][j]) == False: #data_xd[i][j] != -1:
+                    if data_xd[i][j] < 0.001 and pd.isna(data_xd[i][j]) == False:
                         pvalues_x[0].append(j)
                         pvalues_y[0].append(i)
 
-                    elif data_xd[i][j] < 0.01 and pd.isna(data_xd[i][j]) == False: #data_xd[i][j] != -1:
+                    elif data_xd[i][j] < 0.01 and pd.isna(data_xd[i][j]) == False:
                         pvalues_x[1].append(j)
                         pvalues_y[1].append(i)
 
-                    elif data_xd[i][j] < 0.05 and pd.isna(data_xd[i][j]) == False: #data_xd[i][j] != -1:
+                    elif data_xd[i][j] < 0.05 and pd.isna(data_xd[i][j]) == False:
                         pvalues_x[2].append(j)
                         pvalues_y[2].append(i)
 
@@ -512,7 +507,7 @@ class Plot_utils():
             color_scale = 0.2*float(i)/float(len(data)-1)
             ax.plot(x, y, '-', color=self.cmap(0.4+color_scale), linewidth=2, alpha=0.5)
 
-        ax.plot(data[0][features["x"]], data[0][features["y"]], '-', color=self.cmap(0.3), linewidth=5, alpha=1)
+        ax.plot(data[0][features["x"]], data[0][features["y"]], '-', color=self.cmap(0.3), linewidth=3, alpha=1)
         ax.set_xlabel(features["xlabel"])
         ax.set_ylabel(features["ylabel"])
         return ax
@@ -528,12 +523,12 @@ class Plot_utils():
         class2_y = json.loads(data.iloc[0].loc["class2_y"])
 
         if "colors" not in features or "data" not in features["colors"]: ax.plot(x, y, linestyle="", marker="o", markeredgecolor=self.cmap(0.5),
-                                                                                 markerfacecolor=self.cmap(0.7), markersize=5)
+                                                                                 markerfacecolor=self.cmap(0.7), markersize=2.5)
         else:                                                            ax.plot(x, y, linestyle="", marker="o", markeredgecolor=features["edgecolors"]["data"],
-                                                                                 markerfacecolor=features["colors"]["data"], markersize=5)
+                                                                                 markerfacecolor=features["colors"]["data"], markersize=2.5)
         
-        ax.plot(class1_x, class1_y, linestyle="", marker="o", markeredgecolor=features["colors"]["class1"], markerfacecolor=features["colors"]["class1"], markersize=5)
-        ax.plot(class2_x, class2_y, linestyle="", marker="o", markeredgecolor=features["colors"]["class2"], markerfacecolor=features["colors"]["class2"], markersize=5)
+        ax.plot(class1_x, class1_y, linestyle="", marker="o", markeredgecolor=features["colors"]["class1"], markerfacecolor=features["colors"]["class1"], markersize=2.5)
+        ax.plot(class2_x, class2_y, linestyle="", marker="o", markeredgecolor=features["colors"]["class2"], markerfacecolor=features["colors"]["class2"], markersize=2.5)
 
         y_fit1 = self.get_fit(class1_x, class1_y)
         if "colors" not in features: ax.plot(class1_x, y_fit1, linestyle="--", linewidth=3, color=self.cmap(0.3))
@@ -566,9 +561,9 @@ class Plot_utils():
 
         coefficient_names = [coefficient[8::] for coefficient in data.index]
         for i in range(data.shape[0]):
-            ax.annotate(coefficient_names[i], (i, data.iloc[i].loc[features["x"]]))
+            ax.annotate(coefficient_names[i], (i, data.iloc[i].loc[features["x"]]), fontsize=rcParams['legend.fontsize'])
             color_scale = data.iloc[i].loc[features["z"]] / (features["zcutoff"][1]-features["zcutoff"][0])
-            ax.plot(i, data.iloc[i].loc[features["x"]], 's', color=self.cmap(color_scale*0.8), markerfacecolor=self.cmap(color_scale), markersize=10, alpha=0.7)
+            ax.plot(i, data.iloc[i].loc[features["x"]], 's', color=self.cmap(color_scale*0.8), markerfacecolor=self.cmap(color_scale), markersize=5, alpha=0.7)
         
         # color bar
         ax_inset   = inset_axes(ax, width="2%", height="30%", loc="upper left")
@@ -599,31 +594,29 @@ class Plot_utils():
         ax.plot(x, y, linestyle="", marker="o", markeredgecolor=features["edgecolor"], markerfacecolor=features["color"], markersize=5, alpha=0.3)
 
         if "stats" in features and "pearson" in features["stats"]:
-            y_fit = self.get_fit(x, y)
+            y_fit = self.get_fit(x.tolist(), y.tolist())
             ax.plot(x, y_fit, linestyle="--", linewidth=2, color=features["linecolor"])
 
         if "stats" in features and features["stats"] == "pearson2":
             r = stats.pearsonr(x, y)
-            # anchored_text = AnchoredText("r² " + str(round(math.pow(r.statistic, 2), 4)) + " (" + str('{:.2e}'.format(r.pvalue)) + ")", loc=2) # <- removed on 250624
 
             # <- if...else statement added on 250624
             if r.pvalue > 0.000001: 
-                anchored_text = AnchoredText("r² " + str(round(math.pow(r.statistic, 2), 4)) + " (" + str('{:.2e}'.format(r.pvalue)) + ")", loc=2)
+                anchored_text = AnchoredText("r² " + str(round(math.pow(r.statistic, 2), 4)) + " (" + str('{:.2e}'.format(r.pvalue)) + ")", loc=2, prop=dict(size=rcParams['legend.fontsize']))
 
             else:
-                anchored_text = AnchoredText("r² " + str(round(math.pow(r.statistic, 2), 4)) + " (< " + str('{:.2e}'.format(0.000001)) + ")", loc=2)
+                anchored_text = AnchoredText("r² " + str(round(math.pow(r.statistic, 2), 4)) + " (< " + str('{:.2e}'.format(0.000001)) + ")", loc=2, prop=dict(size=rcParams['legend.fontsize']))
 
             ax.add_artist(anchored_text)
 
         if "stats" in features and features["stats"] == "spearman":
             s = stats.spearmanr(x, y)
-            # anchored_text = AnchoredText("s " + str(round(s.statistic, 4)) + "  (" + str('{:.2e}'.format(s.pvalue)) + ")", loc=2) # <- removed on 250624
             # <- if...else statement added on 250624
             if s.pvalue > 0.000001: 
-                anchored_text = AnchoredText("s " + str(round(s.statistic, 4)) + "  (" + str('{:.2e}'.format(s.pvalue)) + ")", loc=2)
+                anchored_text = AnchoredText("s " + str(round(s.statistic, 4)) + "  (" + str('{:.2e}'.format(s.pvalue)) + ")", loc=2, prop=dict(size=rcParams['legend.fontsize']))
 
             else:
-                anchored_text = AnchoredText("s " + str(round(s.statistic, 4)) + "  (< " + str('{:.2e}'.format(0.000001)) + ")", loc=2)
+                anchored_text = AnchoredText("s " + str(round(s.statistic, 4)) + "  (< " + str('{:.2e}'.format(0.000001)) + ")", loc=2, prop=dict(size=rcParams['legend.fontsize']))
 
             ax.add_artist(anchored_text)
 
@@ -632,7 +625,6 @@ class Plot_utils():
 
         #ax.set_yticks(self.get_ticks(y))
         ax.set_ylabel(features["ylabel"])
-
 
         if "x_mute" in features and features["x_mute"] == True:
             ax.tick_params(axis='x', which='both', bottom=False, labelbottom=False)
@@ -654,12 +646,6 @@ class Plot_utils():
         if "color" not in features: features["color"] = self.cmap(0.55)
 
         if "stats" in features and features["stats"] == True:
-            # marked (<-) added / removed on 250529
-            #if len(data["model predictions"]) > 0: # <- removed
-            #    label = (features["label"] + "\n"
-            #            + "mean: " + str(round(np.mean(data["model predictions"]), 4)) + "\n"
-            #            + "std:  " + str(round(np.std(data["model predictions"]), 4)) + "\n") # <- removed
-
             if len(model_predictions) > 0: # <- added
                 label = (features["label"] + "\n"
                         + "mean: " + str(round(np.mean(model_predictions), 4)) + "\n"
@@ -675,17 +661,17 @@ class Plot_utils():
         for exon in data["exon predictions"]:
             if "yrange" not in features:
                 # ax.plot([ejc_pos, ejc_pos], [min(data["model predictions"]), max(data["model predictions"])], "--", color="lightgray", linewidth=2) # <- removed
-                ax.plot([ejc_pos, ejc_pos], [min(model_predictions), max(model_predictions)], "--", color="lightgray", linewidth=2) # <- added
+                ax.plot([ejc_pos, ejc_pos], [min(model_predictions), max(model_predictions)], "--", color="lightgray", linewidth=0.5) # <- added
 
             else:
-                ax.plot([ejc_pos, ejc_pos], [features["yrange"][0], features["yrange"][1]], "--", color="lightgray", linewidth=2)
+                ax.plot([ejc_pos, ejc_pos], [features["yrange"][0], features["yrange"][1]], "--", color="lightgray", linewidth=0.5)
 
             ejc_pos += len(data["exon predictions"][exon])
 
         if pd.isna(data["real positions"]) == False:
             for exon in data["real positions"]:
                 for i in range(len(data["real positions"][exon])):
-                    ax.scatter(data["real positions"][exon][i], data["real predictions"][exon][i], color=features["color"], marker="o", s=20, zorder=1)
+                    ax.scatter(data["real positions"][exon][i], data["real predictions"][exon][i], color=features["color"], marker="o", s=3, zorder=1)
                     
         ax.legend()
         if "xlabel" in features: ax.set_xlabel(features["xlabel"])
@@ -752,7 +738,7 @@ class Plot_utils():
     # checked
     def plot_dendrogram(self, ax, data, features):
         hierarchy.set_link_color_palette(['darkcyan', 'cornflowerblue', 'mediumslateblue', 'darkmagenta'])
-        plot_features = hierarchy.dendrogram(data, ax=ax, color_threshold=0.1, p=20, leaf_rotation=90., leaf_font_size=9,#rcParams["xtick.labelsize"],
+        plot_features = hierarchy.dendrogram(data, ax=ax, color_threshold=0.1, p=20, leaf_rotation=90., leaf_font_size=7,#rcParams["xtick.labelsize"],
                                              show_contracted=True, labels=features["projects"])
         ax.tick_params(axis='both', which='both', bottom=False, left=False, right=False, top=False, labelleft=False)
         return ax, plot_features["ivl"]
@@ -851,8 +837,6 @@ class Plot_utils():
         for i in range(len(data)):
             hist, bin_edges = np.histogram(data[i][xcols[i]], bins=bins, density=density)
             values.append(data[i][xcols[i]])
-            #print("i", i, len(data[i][xcols[i]]))
-            #print("<", len([1 for val in data[i][xcols[i]] if val < 0.5]))
 
             # append pseudo-element for better visualization
             bin_edges = np.append(bin_edges, 1+1/bins)
@@ -981,9 +965,6 @@ class Plot_utils():
         if "duplicate_axis" in features and features["duplicate_axis"] == True: # <- added
             ax2 = ax.twinx() # <- indention changed from here
             ax.set_zorder(ax2.get_zorder()+1)
-            # ax.patch.set_visible(False) # <- shifted below after if-statement
-            # ax.set_xlim(xrange) # <- shifted below after if-statement
-            # ax.set_ylim(yrange) # <- shifted below after if-statement
             
             if "bar_items" in features:
                 item_count = 0
@@ -1016,34 +997,15 @@ class Plot_utils():
             ax.tick_params(axis='x', which='both', bottom=False, labelbottom=False)
 
         return ax
-
-
-    # marked (<-) added / removed on 250529
-    '''
-     def xy_plot(self, ax, data, features):       
-        ax.plot(data[features["x"]], data[features["ycols"][0]], color=self.cmap(0.6), label=features["labels"][0],
-                linestyle="--", marker="o", markeredgecolor=self.cmap(0.5), markerfacecolor=self.cmap(0.7), markersize=7)
-        ax.plot(data[features["x"]], data[features["ycols"][1]], color=self.cmap(0.4), label=features["labels"][1],
-                linestyle="--", marker="v", markeredgecolor=self.cmap(0.3), markerfacecolor=self.cmap(0.5), markersize=7)
-        ax.set_ylim(features["yrange"])
-
-        ax.set_xlabel(features["xlabel"])
-        ax.set_ylabel(features["ylabel"])
-
-        ax.legend()
-        ax.set_yticks(self.get_ticks([*data[features["ycols"][0]], *data[features["ycols"][1]]]))
-        return ax
-    ''' # <- removed
     
    
-    # <- function added
     def xy_plot(self, ax, data, features):
         if "colors" not in features: features["colors"]         = [self.cmap(0.25+0.25*i) for i in range(len(features["x"]))]
         if "edgecolors" not in features: features["edgecolors"] = [self.cmap(0.15+0.25*i) for i in range(len(features["x"]))]
 
         for i in range(len(features["x"])):  
             ax.plot(data[features["x"][i]], data[features["y"][i]], label=features["labels"][i], linestyle='None',
-                    marker="o", markeredgecolor=features["edgecolors"][i], markerfacecolor=features["colors"][i], markersize=7)
+                    marker="o", markeredgecolor=features["edgecolors"][i], markerfacecolor=features["colors"][i])
         
         if "xrange" in features: ax.set_ylim(features["xrange"])
         if "yrange" in features: ax.set_ylim(features["yrange"])

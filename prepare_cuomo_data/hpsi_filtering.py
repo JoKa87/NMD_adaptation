@@ -7,7 +7,6 @@ import time
 
 parent_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
 
-
 # assessment of files downloaded on 250407
 # manual download starting from https://www.hipsci.org/#/assays/gtarray, clicking on the desired cell line
 # on the appearing link, selecting the row "Exome-seq	Imputed and phased genotypes	ENA	Feeder-free	8", clicking "ENA"
@@ -111,6 +110,9 @@ def _apply_filter(errors, variants, genotype_path, skiprows_info, cell_line):
             else: 
                 print("< 'GT' not found in the first position of format column")
                 print(selected_genotype.iloc[match_index[0]].loc["FORMAT"])
+            
+            #print("i2", i, selected_genotype.shape[0], selected_genotype.iloc[match_index[0]].loc["FORMAT"], selected_genotype.iloc[match_index[0]].loc[cell_line], 
+            #     selected_variants.at[selected_variants.index[i], "ID:heterozygous"])
 
     del genotype
     gc.collect()
@@ -131,7 +133,10 @@ def _check_format(genotype_dir):
             ref_cols  = ("#CHROMPOSIDREFALTQUALFILTERINFOFORMAT"+cell_line)
 
             if test_cols == ref_cols:
+                #print("<", cell_line, "@", i)
                 skiprows_info[cell_line] = i
+                #print(" ", ref_cols)
+                #print(" ", test_cols)
 
     print("<", len(skiprows_info), "column descriptions detected.")
     return skiprows_info
@@ -194,6 +199,7 @@ if mode == "test_downloads":
     for i, cell_line in enumerate(cell_lines):
         if cell_line in genotypes:
             entries = genotypes[cell_line].split(".")
+            #print(i, cell_line, ("".join(entry for j, entry in enumerate(entries) if j > 0 and j <= 3)))
             format_test.append("".join(entry for j, entry in enumerate(entries) if j > 0 and j <= 3))
         
         else:

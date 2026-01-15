@@ -28,74 +28,42 @@ def main():
             "type"          : "step_histogram"
             },
             {
-            "data"          : [],
-            "datatype"      : ["pandas"],
-            "extensions"    : [None],
-            "features"      : {
-                               "stats"      : "pearson2",
-                               "x"          : "LABEL:NMD score",
-                               "xcol"       : [[None]],
-                               "y"          : "LABEL:avg. NMD score",
-                               "xlabel"     : "NMD susceptibility of indidivual variant",
-                               "ylabel"     : "averaged NMD susceptibility \n of identical variants"
-                              },
-            "paths"         : [parent_dir+r"\data\model_training_variants_full_block_correlation.txt"],
-            "separators"    : [","],
-            "type"          : "correlation"
-            },
-            {
-            "data"          : [],
-            "datatype"      : ["pandas"],
-            "extensions"    : [None],
-            "features"      : {
-                              "x"           : "average",
-                              "xcol"        : [[None]],
-                              "ylabel"      : "feature importance",# "mean decrease in impurity",
-                              "z"           : "sem",
-                              "zcutoff"     : (0, 0.01),
-                              "zlabel"      : "sem"
-                              },
-            "paths"         : [parent_dir+r"\data\nmdelphi\forest_importances.txt"], # insert model folder name here
-            "separators"    : [","],
-            "type"          : "random forest coefficients"
-            },
-            {
-            "data"          : [],
-            "datatype"      : ["pandas"],
-            "extensions"    : [None],
-            "features"      : {
-                               "stats"      : "pearson2",
-                               "x"          : "LABEL:NMD score",
-                               "xcol"       : [[None]],
-                               "y"          : "FEATURE:prediction",
-                               "xlabel"     : "NMD susceptibility of indidivual variant",
-                               "ylabel"     : "predicted NMD susceptibility"
-                              },
-            "paths"         : [parent_dir+r"\data\nmdelphi\single_unbalanced\all_preds.txt"],
-            "separators"    : [","],
-            "type"          : "correlation"
-            },
-            {
-            "data"          : [],
-            "datatype"      : ["pandas"],
-            "extensions"    : ["balanced_roc"],
-            "features"      : {
-                               "x"           : "fpr",
-                               "xcol"        : [[None]],
-                               "y"           : "tpr",
-                               "xlabel"      : "false positive rate",
-                               "ylabel"      : "true positive rate"
-                              },
-            "paths"         : [parent_dir+r"\data\nmdelphi\balanced"],
-            "separators"    : [","],
-            "type"          : "auroc"
+             "convert_label" : False,
+             "data"          : [],
+             "datatype"      : ["pandas"],
+             "extensions"    : [None],
+             "features"      : {
+                                "boxtype"      : "compact",
+                                "colors"       : ["royalblue", "crimson"],
+                                "item"         : "",
+                                "meanline"     : False,
+                                "reverse"      : False,
+                                "scalebar"     : True,
+                                "showfliers"   : False,
+                                "showmeans"    : True,
+                                "tag"          : "target",
+                                "xcol"         : [[None]],
+                                "ycol"         : ["class 1", "class 2"],
+                                "xmute"        : False,
+                                "ylabel"       : "log2FC (SMG1i/DMSO)",
+                                "ylabels"      : ["escape / \n target"]
+                               },
+             "filter"        : {
+                                "allelic_fraction":     (0.4, 1),
+                                "expression_threshold": 100,
+                                "pred_threshold":       0.57
+                               },
+             "off"           : False,
+             "paths"         : [r"C:\Programming\Translational_genomics\NMD_analysis\data\control_filtered.txt"],
+             "separators"    : [","],
+             "type"          : "box_plot"
             }
         ]
     
 
-    dims           = [3, 4]
-    resolution     = 600
-    run_dir        = parent_dir+r"\data"
+    dims       = [4, 4]
+    resolution = 600
+    run_dir    = parent_dir+r"\data"
 
     # loading section
     pu = Plot_utils()
@@ -106,27 +74,35 @@ def main():
 
     # define figure
     fig = plt.figure(figsize=(180/25.4, 180/25.4))
-    plt.subplots_adjust(wspace=0.15, hspace=0.25)
+    plt.subplots_adjust(hspace=0.25)
 
     gs = fig.add_gridspec(dims[0], 3*dims[1])
 
     subplots = []
     subplots.append(fig.add_subplot(gs[0, 0:6]))
-    subplots.append(fig.add_subplot(gs[0, 6:12]))
-    subplots.append(fig.add_subplot(gs[1:3, 0:6]))
     subplots.append(fig.add_subplot(gs[1, 6:12]))
-    subplots.append(fig.add_subplot(gs[2, 6:12]))
 
     for i in range(len(data)):
-        if data[i]["type"] == "auroc":
-            subplots[i] = pu.plot_auroc(subplots[i], data[i]["data"], data[i]["features"])
+        if data[i]["type"] == "box_plot":
+            # data filtering
+            data[i]["data"][0] = data[i]["data"][0][data[i]["data"][0]["ID:allelic fraction"] >= data[i]["filter"]["allelic_fraction"][0]]
+            data[i]["data"][0] = data[i]["data"][0][data[i]["data"][0]["ID:allelic fraction"] <= data[i]["filter"]["allelic_fraction"][1]]
+            data[i]["data"][0] = data[i]["data"][0][data[i]["data"][0]["ID:base mean"] >= data[i]["filter"]["expression_threshold"]]
 
-        if data[i]["type"] == "correlation":
-            subplots[i] = pu.plot_correlation(subplots[i], data[i]["data"][0], data[i]["features"])
+            if data[i]["convert_label"] == True:
+                data[i]["data"][0]["LABEL:NMD score"] = convert_labels(data[i]["data"][0]["LABEL:NMD score"].tolist(), input_format="log2FC", output_format="ASE")
 
-        if data[i]["type"] == "random forest coefficients":
-            data[i]["data"][0].index = data[i]["data"][0][data[i]["data"][0].columns[0]]
-            subplots[i]              = pu.plot_coefficients(subplots[i], data[i]["data"][0], data[i]["features"])
+            class1 = data[i]["data"][0][data[i]["data"][0]["FEATURE:prediction"] <= data[i]["filter"]["pred_threshold"]]["LABEL:NMD score"].tolist()
+            class2 = data[i]["data"][0][data[i]["data"][0]["FEATURE:prediction"] > data[i]["filter"]["pred_threshold"]]["LABEL:NMD score"].tolist()
+            mw     = scipy.stats.mannwhitneyu(class1, class2)
+            welch  = scipy.stats.ttest_ind(class1, class2, equal_var=False)
+            print("< mw", round(mw.statistic, 4), round(mw.pvalue, 4), "welch", round(welch.statistic, 4), round(welch.pvalue, 4), "size", len(class1), "/", len(class2))
+            
+            temp_data                   = {"class 1": [class1], "class 2": [class2], "description": data[i]["features"]["ylabels"]}
+            data[i]["features"]["xcol"] = "description"
+            data[i]["features"]["ycol"] = ["class 1", "class 2"]
+            subplots[i]                 = pu.box_plot(subplots[i], pd.DataFrame(temp_data), data[i]["features"])
+            subplots[i].set_yticks([-2, -1.5, -1, -0.5, 0, 0.5, 1, 1.5, 2])
 
         if data[i]["type"] == "step_histogram":
             subplots[i] = pu.plot_step_histogram(subplots[i], data[i]["data"], data[i]["features"])
@@ -135,7 +111,6 @@ def main():
 
     plt.show()
     fig.savefig(run_dir+"\\figures\\Fig2.svg", dpi=resolution, transparent=True)
-    return
 
 
 if __name__ == '__main__':

@@ -23,8 +23,8 @@ def main():
                               "label_col"   : "class",
                               "size_col"    : "size",
                               "xcol"        : [[None]],
-                              "xcols"       : ["NMD not mut.", "NMD mut."],
-                              "xlabel"      : "NMD not mut. / \n NMD mut."
+                              "xcols"       : ["low PTC", "high PTC"],
+                              "xlabel"      : "low / \n high PTC"
                               },
             "off"           : False,
             "paths"         : [parent_dir+r"\data\tcga_class_sizes.txt"],
@@ -40,8 +40,8 @@ def main():
                               "label_col"   : "class",
                               "size_col"    : "size",
                               "xcol"        : [[None]],
-                              "xcols"       : ["low PTC", "high PTC"],
-                              "xlabel"      : "low / \n high PTC"
+                              "xcols"       : ["NMD not mut.", "NMD mut."],
+                              "xlabel"      : "NMD not mut. / \n NMD mut."
                               },
             "off"           : False,
             "paths"         : [parent_dir+r"\data\tcga_class_sizes.txt"],
@@ -105,16 +105,16 @@ def main():
                               "bar_off"     : True,
                               "include_empty": False,
                               "reverse"     : True,
-                              "scale"       : {"binary": True, "ycol": [0.05, 0.01, 0.001], "zcol": [1], "colors": ["crimson", "royalblue"], "sizes": [0, 0.5, 1, 1.5]},
+                              "scale"       : {"binary": True, "ycol": [0.05, 0.01, 0.001], "zcol": [1], "colors": ["crimson", "royalblue"], "sizes": [0, 0.5, 0.75, 1]},
                               "tag"         : "target",
                               "xcol"        : [[None], [None], [None], [None]],
                               "xrange"      : (-0.5, 32.5),
                               "xticks"      : False,
-                              "ylabels"     : ["NMD not mut. / \n nmd mut.", "low / \n high PTC", "low / \n high frameshift"]
+                              "ylabels"     : ["low / \n high PTC", "NMD not mut. / \n nmd mut.", "low / \n high frameshift"]
                               },
             "off"           : False,
-            "paths"         : [parent_dir+r"\data\2025-06-23_16-06-47_TCGA_NMD_targets_analysis_FPKM_exp_ccorr\ptc50_nmd1_class1\class_test.txt",
-                               parent_dir+r"\data\2025-06-23_16-06-47_TCGA_NMD_targets_analysis_FPKM_exp_ccorr\ptc50_class1\class_test.txt",
+            "paths"         : [parent_dir+r"\data\2025-06-23_16-06-47_TCGA_NMD_targets_analysis_FPKM_exp_ccorr\ptc50_class1\class_test.txt",
+                               parent_dir+r"\data\2025-06-23_16-06-47_TCGA_NMD_targets_analysis_FPKM_exp_ccorr\ptc50_nmd1_class1\class_test.txt",
                                parent_dir+r"\data\2025-06-23_16-06-47_TCGA_NMD_targets_analysis_FPKM_exp_ccorr\class_selection_ptc50_class1\class_test.txt"],
             "separators"    : [",", ",", ",", ","],
             "type"          : "project_matrix"
@@ -132,11 +132,11 @@ def main():
                               "tag"         : "target",
                               "xcol"        : [[None] for _ in range(4)],
                               "xmute"       : True,
-                              "ylabels"     : ["NMD not mut. / \n NMD mut.", "low / \n high PTC", "low / \n high frameshift"]
+                              "ylabels"     : ["low / \n high PTC", "NMD not mut. / \n NMD mut.", "low / \n high frameshift"]
                               },
             "off"           : False,
-            "paths"         : [parent_dir+r"\data\2025-06-23_16-06-47_TCGA_NMD_targets_analysis_FPKM_exp_ccorr\ptc50_nmd1_class1\class_test.txt",
-                               parent_dir+r"\data\2025-06-23_16-06-47_TCGA_NMD_targets_analysis_FPKM_exp_ccorr\ptc50_class1\class_test.txt",
+            "paths"         : [parent_dir+r"\data\2025-06-23_16-06-47_TCGA_NMD_targets_analysis_FPKM_exp_ccorr\ptc50_class1\class_test.txt",
+                               parent_dir+r"\data\2025-06-23_16-06-47_TCGA_NMD_targets_analysis_FPKM_exp_ccorr\ptc50_nmd1_class1\class_test.txt",
                                parent_dir+r"\data\2025-06-23_16-06-47_TCGA_NMD_targets_analysis_FPKM_exp_ccorr\class_selection_ptc50_class1\class_test.txt"],
             "separators"    : ["," for _ in range(4)],
             "type"          : "class_boxplot"
@@ -155,13 +155,12 @@ def main():
                               "tag"         : "target",
                               "xcol"        : [[None] for _ in range(4)],
                               "xmute"       : True,
-                              "ylabels"     : ["NMD not mut. / \n NMD mut.", "low / \n high PTC", "low / \n high frameshift"]
+                              "ylabels"     : ["low / \n high PTC", "NMD not mut. / \n NMD mut.", "low / \n high frameshift"]
                               },
             "off"           : False,
-            "paths"         : [parent_dir+r"\data\2025-06-23_16-06-47_TCGA_NMD_targets_analysis_FPKM_exp_ccorr\ptc50_nmd1_class1\class_test.txt",
-                               parent_dir+r"\data\2025-06-23_16-06-47_TCGA_NMD_targets_analysis_FPKM_exp_ccorr\ptc50_class1\class_test.txt",
-                               parent_dir+r"\data\2025-06-23_16-06-47_TCGA_NMD_targets_analysis_FPKM_exp_ccorr\class_selection_ptc50_class1\class_test.txt"],
-            "separators"    : ["," for _ in range(4)],
+            "paths"         : [parent_dir+r"\data\2025-06-23_16-06-47_TCGA_NMD_targets_analysis_FPKM_exp_ccorr\ptc50_class1\class_test.txt",
+                               parent_dir+r"\data\2025-06-23_16-06-47_TCGA_NMD_targets_analysis_FPKM_exp_ccorr\ptc50_nmd1_class1\class_test.txt",
+                               parent_dir+r"\data\2025-06-23_16-06-47_TCGA_NMD_targets_analysis_FPKM_exp_ccorr\class_selection_ptc50_class1\class_test.txt"],            "separators"    : ["," for _ in range(4)],
             "type"          : "class_boxplot"
             },
             {
@@ -177,13 +176,12 @@ def main():
                               "tag"         : "target",
                               "xcol"        : [[None] for _ in range(3)],
                               "xmute"       : False,
-                              "ylabels"     : ["NMD not mut. / \n NMD mut.", "low / \n high PTC", "low / \n high frameshift"]
+                              "ylabels"     : ["low / \n high PTC", "NMD not mut. / \n NMD mut.", "low / \n high frameshift"]
                               },
             "off"           : False,
-            "paths"         : [parent_dir+r"\data\2025-06-23_16-06-47_TCGA_NMD_targets_analysis_FPKM_exp_ccorr\ptc50_nmd1_class1\class_test.txt",
-                               parent_dir+r"\data\2025-06-23_16-06-47_TCGA_NMD_targets_analysis_FPKM_exp_ccorr\ptc50_class1\class_test.txt",
-                               parent_dir+r"\data\2025-06-23_16-06-47_TCGA_NMD_targets_analysis_FPKM_exp_ccorr\class_selection_ptc50_class1\class_test.txt"],
-            "separators"    : ["," for _ in range(3)],
+            "paths"         : [parent_dir+r"\data\2025-06-23_16-06-47_TCGA_NMD_targets_analysis_FPKM_exp_ccorr\ptc50_class1\class_test.txt",
+                               parent_dir+r"\data\2025-06-23_16-06-47_TCGA_NMD_targets_analysis_FPKM_exp_ccorr\ptc50_nmd1_class1\class_test.txt",
+                               parent_dir+r"\data\2025-06-23_16-06-47_TCGA_NMD_targets_analysis_FPKM_exp_ccorr\class_selection_ptc50_class1\class_test.txt"],            "separators"    : ["," for _ in range(3)],
             "type"          : "class_boxplot"
             },
             {
@@ -192,46 +190,152 @@ def main():
             "extensions"    : [None for _ in range(12)],
             "features"      : {
                               "bar_off"     : True,
-                              "layer"       : {0: {"marker": "o", "markersize": 12}},# 1: {"marker": "o", "markersize": 5}},
+                              "layer"       : {0: {"marker": "o", "markersize": 7}},# 1: {"marker": "o", "markersize": 5}},
                               "reverse"     : False,
                               "scale"       : {"binary": True, "ycol": [0.05, 0.01, 0.001], "zcol": [0], "colors": ["royalblue", "crimson"], "sizes": [0, 0.5, 1, 1.5]},
                               "tag"         : "target",
                               "xcol"        : [[None] for _ in range(12)],
-                              "ylabels"     : ["NMD not mut.", "NMD mut.", "low PTC", "high PTC", "low \n frameshift", "high \n frameshift"]
+                              "ylabels"     : ["low PTC", "high PTC", "NMD not mut.", "NMD mut.", "low \n frameshift", "high \n frameshift"]
                               },
             "off"           : False,
-            "paths"         : [parent_dir+r"\data\2025-06-23_16-06-47_TCGA_NMD_targets_analysis_FPKM_exp_ccorr\ptc50_nmd1_class1\stats_summary.txt",
-                               parent_dir+r"\data\2025-06-23_16-06-47_TCGA_NMD_targets_analysis_FPKM_exp_ccorr\ptc50_nmd1_class2\stats_summary.txt",
-                               parent_dir+r"\data\2025-06-23_16-06-47_TCGA_NMD_targets_analysis_FPKM_exp_ccorr\ptc50_class1\stats_summary.txt",
+            "paths"         : [parent_dir+r"\data\2025-06-23_16-06-47_TCGA_NMD_targets_analysis_FPKM_exp_ccorr\ptc50_class1\stats_summary.txt",
                                parent_dir+r"\data\2025-06-23_16-06-47_TCGA_NMD_targets_analysis_FPKM_exp_ccorr\ptc50_class2\stats_summary.txt",
+                               parent_dir+r"\data\2025-06-23_16-06-47_TCGA_NMD_targets_analysis_FPKM_exp_ccorr\ptc50_nmd1_class1\stats_summary.txt",
+                               parent_dir+r"\data\2025-06-23_16-06-47_TCGA_NMD_targets_analysis_FPKM_exp_ccorr\ptc50_nmd1_class2\stats_summary.txt",
                                parent_dir+r"\data\2025-06-23_16-06-47_TCGA_NMD_targets_analysis_FPKM_exp_ccorr\class_selection_ptc50_class1\stats_summary.txt",
                                parent_dir+r"\data\2025-06-23_16-06-47_TCGA_NMD_targets_analysis_FPKM_exp_ccorr\class_selection_ptc50_class2\stats_summary.txt",
-                               parent_dir+r"\data\2025-06-23_16-06-47_TCGA_NMD_targets_analysis_FPKM_exp_ccorr\ptc50_nmd1_class1_smoothing\stats_summary.txt",
-                               parent_dir+r"\data\2025-06-23_16-06-47_TCGA_NMD_targets_analysis_FPKM_exp_ccorr\ptc50_nmd1_class2_smoothing\stats_summary.txt",
                                parent_dir+r"\data\2025-06-23_16-06-47_TCGA_NMD_targets_analysis_FPKM_exp_ccorr\ptc50_class1_smoothing\stats_summary.txt",
                                parent_dir+r"\data\2025-06-23_16-06-47_TCGA_NMD_targets_analysis_FPKM_exp_ccorr\ptc50_class2_smoothing\stats_summary.txt",
+                               parent_dir+r"\data\2025-06-23_16-06-47_TCGA_NMD_targets_analysis_FPKM_exp_ccorr\ptc50_nmd1_class1_smoothing\stats_summary.txt",
+                               parent_dir+r"\data\2025-06-23_16-06-47_TCGA_NMD_targets_analysis_FPKM_exp_ccorr\ptc50_nmd1_class2_smoothing\stats_summary.txt",
                                parent_dir+r"\data\2025-06-23_16-06-47_TCGA_NMD_targets_analysis_FPKM_exp_ccorr\class_selection_ptc50_class1_smoothing\stats_summary.txt",
                                parent_dir+r"\data\2025-06-23_16-06-47_TCGA_NMD_targets_analysis_FPKM_exp_ccorr\class_selection_ptc50_class2_smoothing\stats_summary.txt"],
             "separators"    : ["," for _ in range(12)],
-            "type"          : "correlation_matrix"
-            }
+            "type"          : "correlation_matrix",
+            },
+            {
+            "data"      : [],
+            "datatype"  : ["pandas"],
+            "extensions": [None, None],
+            "features"  : {
+                           "bins"               : 40,
+                           "colors"             : ["forestgreen"],
+                           "density"            : False,
+                           "labels"             : ["PTC mutations"],
+                           "xcol"               : [[None]],
+                           "xlabel"             : "NMD adaptation score",
+                           "x_mute"             : False,
+                           "y_mute"             : True,
+                           "xrange"             : (-0.5, 0.6),
+                           "ylabel"             : "counts"
+                        },
+            "paths"     : [r"C:\Programming\Translational_genomics\NMD_analysis\data\prediction_analysis_tcga\2025-10-24_18-34-19_tcga_patientwise\assembled_selection_stats.txt"],
+            "separators": [","],
+            "selection" : {"binomial padj": 1},
+            "target_col": "binomial statistic",
+            "type"      : "step_histogram"
+            },
+            {
+            "data"      : [],
+            "datatype"  : ["pandas"],
+            "extensions": [None],
+            "features"  : {
+                           "bins"               : 40,
+                           "colors"             : ["forestgreen"],
+                           "density"            : False,
+                           "labels"             : ["PTC mutations"],
+                           "xcol"               : [[None]],
+                           "xlabel"             : "NMD adaptation score",
+                           "x_mute"             : False,
+                           "xrange"             : (-0.5, 0.6),
+                           "ylabel"             : "counts"
+                          },
+            "paths"     : [r"C:\Programming\Translational_genomics\NMD_analysis\data\prediction_analysis_tcga\2025-10-24_18-34-19_tcga_patientwise\assembled_selection_stats.txt"],
+            "separators": [","],
+            "selection" : {"binomial padj": 0.1},
+            "target_col": "binomial statistic",
+            "type"      : "step_histogram"
+            },
+            {
+            "data"      : [],
+            "datatype"  : ["pandas"],
+            "extensions": [None, None],
+            "features"  : {
+                           "bins"               : 40,
+                           "colors"             : ["forestgreen"],
+                           "density"            : False,
+                           "labels"             : ["PTC mutations"],
+                           "xcol"               : [[None]],
+                           "xlabel"             : "NMD adaptation score",
+                           "x_mute"             : False,
+                           "xrange"             : (-0.5, 0.6),
+                           "ylabel"             : "counts"
+                        },
+            "paths"     : [r"C:\Programming\Translational_genomics\NMD_analysis\data\prediction_analysis_msk\2025-11-14_19-11-03_msk_patientwise\assembled_selection_stats.txt"],
+            "separators": [","],
+            "selection" : {"binomial padj": 1},
+            "target_col": "binomial statistic",
+            "type"      : "step_histogram"
+            },
+            {
+            "data"      : [],
+            "datatype"  : ["pandas"],
+            "extensions": [None],
+            "features"  : {
+                           "bins"               : 30,
+                           "colors"             : ["forestgreen"],
+                           "density"            : False,
+                           "labels"             : ["PTC mutations"],
+                           "xcol"               : [[None]],
+                           "xlabel"             : "NMD adaptation score",
+                           "x_mute"             : False,
+                           "xrange"             : (0, 0.6),
+                           "ylabel"             : "counts"
+                          },
+            "paths"     : [r"C:\Programming\Translational_genomics\NMD_analysis\data\prediction_analysis_msk\2025-11-14_19-11-03_msk_patientwise\assembled_selection_stats.txt"],
+            "separators": [","],
+            "selection" : {"binomial padj": 0.1},
+            "target_col": "binomial statistic",
+            "type"      : "step_histogram"
+            },
         ]
     
     item_dict = {
                  "cnv total"                            : "copy number",
+                 "escape"                               : "escape",
+                 "frameshift"                           : "frameshift",
                  "frameshift_mutations"                 : "frameshift mutations",
+                 #"Immune_score"                         : "immune editing",
+                 "ptc_mutations"                        : "PTC mutations alt.",
                  "ptc_mutations2"                       : "PTC mutations",
+                 "target"                               : "NMD targets",
                  "fpkm_unstranded"                      : "NMD activity",
                  "prediction"                           : "NMD susceptibility",
+                 "escape"                                : "NMD escape",
+                 #"total_hla"                            : "immune editing",
+                 #"frameshift_cnv total"                 : "frameshift-copy number",
                  "ptc_mutations2_cnv total"             : "PTC mutations-copy number",
                  "ptc_mutations2_fpkm_unstranded"       : "PTC mutations-NMD activity",
+                 #"ptc_mutations2_escape"                : "PTC mutations-NMD escape",
                  "ptc_mutations2_prediction"            : "PTC mutations-NMD susceptibility",
+                 #"ptc_mutations2_prediction"            : "PTC mutations-NMD susceptibility",
+                 #"ptc_mutations2_total_hla"             : "PTC mutations-immune editing",
+                 #"ptc_mutations2_Immune_score"          : "PTC mutations-immune editing",
+                 #"expression_cnv total"                 : "expression-copy number",
+                 #"expression_fpkm_unstranded"           : "expression-nmd activity",
+                 #"expression_frameshift"                : "expression-frameshift",
+                 #"expression_Immune_score"              : "expression-immune score",
+                 #"expression_ptc_mutations2"            : "basal expression-PTC mutations",
+                 #"expression_target"                    : "expression-nmd targets",
+                 #"fpkm_unstranded_cnv total"            : "nmd activity-copy number",
+                 #"fpkm_unstranded_Immune_score"         : "nmd activity-immune score",
+                 #"Immune_score_cnv total"               : "immune score-copy number",
+                 #"target_cnv total"                     : "NMD targets-copy number",
+                 #"target_fpkm_unstranded"               : "NMD targets-NMD activity",
                  }
 
 
     dims       = (6, 4)
-    g          = (20, 10)
-    margin     = (0.8, 0.2)
     resolution = 600
     run_dir    = parent_dir+r"\data"
 
@@ -242,20 +346,24 @@ def main():
     data = load(data)
 
     # define figure
-    fig = plt.figure(constrained_layout=False)
+    fig = plt.figure(figsize=(180/25.4, 180/25.4), constrained_layout=True)
     gs = fig.add_gridspec(dims[0], 3*dims[1])
 
     subplots = []
     subplots.append(fig.add_subplot(gs[0, 0:1]))
     subplots.append(fig.add_subplot(gs[0, 1:2]))
     subplots.append(fig.add_subplot(gs[0, 2:3]))
-    subplots.append(fig.add_subplot(gs[1, 0:3]))
-    subplots.append(fig.add_subplot(gs[0, 3:6]))
-    subplots.append(fig.add_subplot(gs[1, 3:6]))
-    subplots.append(fig.add_subplot(gs[2, 0:2]))
-    subplots.append(fig.add_subplot(gs[2, 2:4]))
-    subplots.append(fig.add_subplot(gs[2, 4:6]))
-    subplots.append(fig.add_subplot(gs[4:5, 2:6]))
+    subplots.append(fig.add_subplot(gs[1, 0:4]))
+    subplots.append(fig.add_subplot(gs[0, 6:12]))
+    subplots.append(fig.add_subplot(gs[1, 6:12]))
+    subplots.append(fig.add_subplot(gs[2, 0:3]))
+    subplots.append(fig.add_subplot(gs[2, 4:7]))
+    subplots.append(fig.add_subplot(gs[2, 8:11]))
+    subplots.append(fig.add_subplot(gs[4:5, 5:12]))
+    subplots.append(fig.add_subplot(gs[5, 0:2]))
+    subplots.append(fig.add_subplot(gs[5, 3:5]))
+    subplots.append(fig.add_subplot(gs[5, 6:8]))
+    subplots.append(fig.add_subplot(gs[5, 9:11]))
 
     step = 0
     for i in range(len(data)):
@@ -270,27 +378,17 @@ def main():
             if len(np.unique(dimension_test)) != 1: print("< dimension error @class_boxplot")
 
             # initialize container for class item values, removing datatype specifiers (ID: or FEATURE:)
-            # marked (<-) added / removed on 250516 to allow selection of features
-            #temp_data = {item_dict[data[i]["data"][0].iloc[j].loc["item"].replace("FEATURE:", "").replace("ID:", "")]:
-            #             {"class 1": [], "class 2": [], "description": data[i]["features"]["ylabels"]} for j in range(data[i]["data"][0].shape[0])} # <- removed
             temp_data = {item_dict[data[i]["data"][0].iloc[j].loc["item"].replace("FEATURE:", "").replace("ID:", "")]:
                          {"class 1": [], "class 2": [], "description": data[i]["features"]["ylabels"]} for j in range(data[i]["data"][0].shape[0])
                          if data[i]["data"][0].iloc[j].loc["item"].replace("FEATURE:", "").replace("ID:", "") in item_dict} # <- added
 
             # fill container with class item values for each class test
             for j in range(len(data[i]["data"])):
-                # marked (<-) added / removed on 250516 to allow selection of features
-                # data[i]["data"][j]["item"] = [item_dict[data[i]["data"][j].iloc[k].loc["item"].replace("FEATURE:", "").replace("ID:", "")] # <- removed from here
-                #                              for k in range(data[i]["data"][j].shape[0])]
-                # [temp_data[data[i]["data"][j].iloc[k].loc["item"]]["class 1"].append(data[i]["data"][j].iloc[k].loc["class 1"]) for k in range(data[i]["data"][j].shape[0])]
-                # [temp_data[data[i]["data"][j].iloc[k].loc["item"]]["class 2"].append(data[i]["data"][j].iloc[k].loc["class 2"]) for k in range(data[i]["data"][j].shape[0])]
-                # <- removed until here
-                for k in range(data[i]["data"][j].shape[0]): # <- added from here
+                for k in range(data[i]["data"][j].shape[0]):
                     if data[i]["data"][j].iloc[k].loc["item"].replace("FEATURE:", "").replace("ID:", "") in item_dict:
                         data[i]["data"][j].at[data[i]["data"][j].index[k], "item"] = item_dict[data[i]["data"][j].iloc[k].loc["item"].replace("FEATURE:", "").replace("ID:", "")] 
                         temp_data[data[i]["data"][j].iloc[k].loc["item"]]["class 1"].append(data[i]["data"][j].iloc[k].loc["class 1"])
                         temp_data[data[i]["data"][j].iloc[k].loc["item"]]["class 2"].append(data[i]["data"][j].iloc[k].loc["class 2"])
-                # <- added until here
 
             data[i]["features"]["xcol"]   = "description"
             data[i]["features"]["ycol"]   = ["class 1", "class 2"]
@@ -324,8 +422,6 @@ def main():
             
             # create features only for one half of the data representing one layer
             data[i]["features"]["xcol"] = ["pair" for _ in range(int(len(data[i]["data"])/2))]
-            # changed on 250317 from padj to p
-            #data[i]["features"]["ycol"] = ["spearman-padj" for _ in range(int(len(data[i]["data"])/2))]
             data[i]["features"]["ycol"] = ["spearman-p" for _ in range(int(len(data[i]["data"])/2))]
             data[i]["features"]["zcol"] = ["spearman-r" for _ in range(int(len(data[i]["data"])/2))]
 
@@ -362,13 +458,20 @@ def main():
             data[i]["features"]["zcol"] = ["statistic", "statistic", "statistic", "statistic"]
             subplots[i]                 = pu.dotplot(subplots[i], data[i]["data"], data[i]["features"])
 
+        
+        if data[i]["type"] == "step_histogram":
+            selection_col               = list(data[i]["selection"].keys())[0]
+            data[i]["data"][0]          = data[i]["data"][0][data[i]["data"][0][selection_col] <= data[i]["selection"][selection_col]][[data[i]["target_col"]]]
+            print(data[i]["data"][0])
+            data[i]["features"]["xcol"] = [[data[i]["target_col"]]]
+            subplots[i]                 = pu.plot_step_histogram(subplots[i], data[i]["data"], data[i]["features"])
+
         if i != 1 and i != 2:
-            subplots[i].text(-0.1, 1.1, string.ascii_lowercase[step], transform=subplots[i].transAxes, size=14, weight='bold')
+            subplots[i].text(-0.1, 1.1, string.ascii_lowercase[step], transform=subplots[i].transAxes, size=9, weight='bold')
             step += 1
 
     plt.show()
     fig.savefig(run_dir + "\\Fig5.svg", dpi=resolution)
-    return
 
 
 if __name__ == '__main__':

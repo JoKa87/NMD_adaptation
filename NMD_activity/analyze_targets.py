@@ -15,8 +15,7 @@ from shared_utils import *
 # parameters
 params = {
             "appended_col"               : "NMD_targets",
-            # marked (<-) added on 250429 to allow skipping of append_features
-            "append_features"            : True, # <- added
+            "append_features"            : True,
             "append_sample_scores"       : False,
             "apply_filters"              : True, # for full test run @tcga_tools, filters need to be switched off (typically switched on)
             "clinical_data_path"         : parent_dir+r"\data\tcga_survival_data.txt",
@@ -25,9 +24,8 @@ params = {
             "create_dataset"             : False,
             "data_dir"                   : parent_dir+r"\data", # here, TCGA data should be located
             "extended_features_path"     : parent_dir+r"\data\tcga_variants.txt",
-            # marked (<-) added on 250429 to facilitate off-switching of feature integration
-            "extend_features"            : True, # <- added
-            "file_tag"                   : "_TCGA_NMD_targets_analysis_FPKM_exp_ccorr", # "_TCGA_NMD_targets_analysis_FPKM_exp_ccorr" "_TCGA_NMD_targets_analysis_FPKM_exp",
+            "extend_features"            : True,
+            "file_tag"                   : "_TCGA_NMD_targets_analysis_FPKM_exp_ccorr_frameshift",
             "filter_mutations"           : False,
             "filter_mutation_margin"     : 0.25,
             "filter_mutations_type"      : "adjusted", # "adjusted" "threshold"
@@ -63,25 +61,25 @@ params = {
             "non_targets_explicit"       : True, # if False non targets are defined as all entries that are not targets
             "os_sep"                     : "//",
             "processed_targets_fname"    : "TCGA_NMD_targets_analysis_FPKM_exp_ccorr.txt",
-            "projects"                   : "all", # "all",
+            "projects"                   : "all", # "all" or list with specific projects
             "rna_calculation"            : ["avg", "avg", "avg"],
             "rna_threshold"              : 0,
             "run_dir"                    : parent_dir+r"\data",
             "sample_filter"              : {"FEATURE:frameshift": {"range": (0, 13), "inclusive": True, "include_misses": False}, "ptc_mutations": {"range": (50, 100000), "inclusive": True, "include_misses": False}},
-            "score_threshold"            : {"FEATURE:escape": (0, 0.57), "FEATURE:target": (0.64, 1)},
+            "score_threshold"            : {"FEATURE:escape": (0, 0.57), "FEATURE:target": (0.64, 1)}, # threshold for NMD classification (241009), last values: "FEATURE:escape": (0, 0.54), "FEATURE:target": (0.66, 1)
             "shared_gene_fname"          : None,
             "stats_exceptions"           : {"FEATURE:escape": "relative_count_by_threshold", "FEATURE:target": "relative_count_by_threshold",
-                                            "FEATURE:frameshift_mutations": "sum_wo_exception", "FEATURE:ptc_mutations2": "sum_wo_exception"},
-            "status_fname"               : "tcga_data_info.json",
-            "target_fname"               : "wt_nmd_targets.txt",
-            "target_identifier"          : {"rna": "gene_name", "wxs": "Hugo_Symbol"},
+                                            "FEATURE:frameshift_mutations": "sum_wo_exception", "FEATURE:ptc_mutations2": "sum_wo_exception"}, # "FEATURE:frameshift": "sum",  # defines exception from mean calculation of extraction targets # "FEATURE:prediction": "count_by_threshold", "LABEL:NMD score": "test"
+            "status_fname"               : "filtered_status_w_md5sum.json", # "filtered_status_with_sclc.json", "filtered_extracted_status.json" "filtered_status_ptc.json"
+            "target_fname"               : "Wang_et_al_targets_non_targets.txt", # "Wang_et_al_targets_non_targets.txt" "NMD_targets.txt" "NMD_machinery.txt"
+            "target_identifier"          : {"rna": "gene_name", "wxs": "Hugo_Symbol"}, # {"rna": "gene_id", "wxs": "Gene"},
             "target_normalization"       : True,
             "target_filter"              : 0,
             "target_size"                : None, # determined @ runtime, used for testing
             "target_threshold"           : 0, # expression of 0 is excluded
             "track_mutations"            : True,
             "transform_type"             : "RNA_ccorr_ptc", # "shared_RNA" used for SCLC-containing data "RNA_c_ptc" "RNA_ccorr_ptc" used for TCGA-only analysis
-            "variant_value_filter"       : {"ID:ptc reads": 1, "ID:cnv total_EXCLUDED": [0]}, # minimum expression for variants to be included in the analysis
+            "variant_value_filter"       : {"ID:ptc reads": 1, "ID:cnv total_EXCLUDED": [0], "ID:variant classification": ["Frame_Shift_Del", "Frame_Shift_Ins"]}, # minimum expression for variants to be included in the analysis
             "wxs_identifier"             : "Transcript_ID" # wxs column that is used to create variant id and conduct ptc checks
         }
 
@@ -163,7 +161,7 @@ def main():
             print("< removing unshared genes reduced dataset from", init_shape, "to", targets.shape[0])
 
         if params["shared_gene_fname"] == None:
-            rna          = load_rna(params["run_dir"]+params["os_sep"]+"tcga_rna_example", params)
+            rna          = load_rna(params["run_dir"]+params["os_sep"]+"TCGA_rna_example", params)
             init_shape   = targets.shape[0]
             targets      = targets[targets["gene_name"].isin(rna["gene_name"])]
             print("< removing unshared genes reduced dataset from", init_shape, "to", targets.shape[0])
@@ -196,9 +194,7 @@ def main():
         targets = load_df(params["run_dir"]+params["os_sep"]+params["processed_targets_fname"], delimiter=",")
         extended_features = pd.DataFrame()
 
-        # marked (<-) added/removed to facilitate skipping of integration of clinical and PTC data
-        #if len(params["info"]["extended_features"]) > 0: # <- removed
-        if params["extend_features"] == True and len(params["info"]["extended_features"]) > 0: # <- added
+        if params["extend_features"] == True and len(params["info"]["extended_features"]) > 0:
             extended_features                           = load_df(params["extended_features_path"], delimiter=",")
             extended_features["FEATURE:ptc_mutations2"] = [1 for _ in range(extended_features.shape[0])]
             extended_features["FEATURE:escape"]         = extended_features["FEATURE:prediction"]
@@ -214,8 +210,6 @@ def main():
 
                 # apply further filters defined by variant_value_filter
                 if len(params["variant_value_filter"]) > 0:
-                    # changed 250313 (now same as in analyze_predictions)
-                    #extended_features = filter_variants(extended_features, params)
                     extended_features = apply_value_filter(extended_features, params["variant_value_filter"], "variant filter")
 
                 # check for expired placeholders
@@ -229,10 +223,8 @@ def main():
             params["info"]["extended_features"].extend(counts)
 
         targets = remove_misses(targets, params)
-        # marked (<-) added/removed on 250429 to allow skipping of append_features
-        # targets = append_features(targets, params) # <- removed
         if params["append_features"] == True:
-            targets = append_features(targets, params) # <- added
+            targets = append_features(targets, params)
 
         # conduct calculations
         targets = calculate_target_expression(targets, extended_features, params)

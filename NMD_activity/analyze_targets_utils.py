@@ -158,7 +158,6 @@ def calculate_target_expression(targets, extended_features, params):
 
                     # filtering step
                     if targets.iloc[k].loc[params["target_identifier"]["rna"]] in filtered_index[project][rna_value]:
-                    
                         if params["target_normalization"] == False:
                             target_avg, _, _ = calculate_value(json.dumps([targets.iloc[k].loc[rna_value][j]]), params["rna_calculation"],
                                                                get_stats=True, threshold=params["target_threshold"])
@@ -195,7 +194,7 @@ def calculate_target_expression(targets, extended_features, params):
                 target_sum = 0
                 for mutation_col in params["info"]["combined_mutations"][col]:
                     target_avg, _, _ = calculate_value(json.dumps([targets.iloc[k].loc[mutation_col][j]]), params["rna_calculation"], get_stats=True)
-                    if len(targets.iloc[k].loc[mutation_col][j]) > 0: print(mutation_col, target_avg, targets.iloc[k].loc[mutation_col][j])
+                    #if len(targets.iloc[k].loc[mutation_col][j]) > 0: print(mutation_col, target_avg, targets.iloc[k].loc[mutation_col][j])
                     if target_avg != None: target_sum += target_avg
 
                 sample_scores[project][col][sample_index] = target_sum
@@ -321,6 +320,8 @@ def calculate_target_expression(targets, extended_features, params):
                                                        if params["filter_samples"] == False or sample in sample_filter[project]}}
                                } for project in projects}
     
+
+    #print(json.dumps(sample_scores["TCGA-ACC"], indent=4))
     
     # test for inconsistent sizes of extracted targets
     for project in filtered_index:
@@ -893,7 +894,7 @@ def _append_features(df, data, params, it, step, text):
                 
                 # marked (<-) added / removed on 250605
                 # elif "nmd mutations" not in text: # <- removed
-                elif "hla mutations" not in text and "nmd mutations" not in text: # <- removed
+                elif "hla mutations" not in text and "nmd mutations" not in text: # <- added
                     values.append(None)
 
                 else: # for nmd mutations, missing values mean that no mutations were found for the respective case id

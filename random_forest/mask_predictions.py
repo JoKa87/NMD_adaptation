@@ -24,25 +24,25 @@ class Mask_predictions():
                                                                 for key1 in self.mutation_stats["del-1"]}},
                                             **{"ins+1":       {key1: {key2: [0 for _ in range(100)] for key2 in self.mutation_stats["ins+1"][key1]}
                                                                 for key1 in self.mutation_stats["ins+1"]}},
-                                            **{"topology":    {key: [0 for _ in range(100)] for key in ["del-1", "frameshift", "ins+1", "missense", "nonsense", "total"]}}
+                                            **{"topology":    {key: [0 for _ in range(100)] for key in ["del-1", "frameshift", "ins+1", "missense", "nonsense", "silent", "total"]}}
                                             }
                 
             elif self.params["apply_mutation_stats"] == True and self.params["apply_3mers"] == True:
                 self.probability_trajectory = {
-                                            **{"pairs_3mers": {key1: {key2: [0 for _ in range(100)] for key2 in self.mutation_stats["pairs_3mers"][key1]}
-                                                                for key1 in self.mutation_stats["pairs_3mers"]}},
-                                            **{"del-1_3mers": {key1: {key2: [0 for _ in range(100)] for key2 in self.mutation_stats["del-1_3mers"][key1]}
-                                                                for key1 in self.mutation_stats["del-1_3mers"]}},
-                                            **{"ins+1_3mers": {key1: {key2: [0 for _ in range(100)] for key2 in self.mutation_stats["ins+1_3mers"][key1]}
-                                                                for key1 in self.mutation_stats["ins+1_3mers"]}},
-                                            **{"topology":    {key: [0 for _ in range(100)] for key in ["del-1", "frameshift", "ins+1", "missense", "nonsense", "total"]}}
-                                            }
+                                                **{"pairs_3mers": {key1: {key2: [0 for _ in range(100)] for key2 in self.mutation_stats["pairs_3mers"][key1]}
+                                                                    for key1 in self.mutation_stats["pairs_3mers"]}},
+                                                **{"del-1_3mers": {key1: {key2: [0 for _ in range(100)] for key2 in self.mutation_stats["del-1_3mers"][key1]}
+                                                                    for key1 in self.mutation_stats["del-1_3mers"]}},
+                                                **{"ins+1_3mers": {key1: {key2: [0 for _ in range(100)] for key2 in self.mutation_stats["ins+1_3mers"][key1]}
+                                                                    for key1 in self.mutation_stats["ins+1_3mers"]}},
+                                                **{"topology":    {key: [0 for _ in range(100)] for key in ["del-1", "frameshift", "ins+1", "missense", "nonsense", "silent", "total"]}}
+                                                }
                 
             else:
                 self.probability_trajectory = {
-                                            **{"topology":    {key: [0 for _ in range(100)] for key in ["del-1", "frameshift", "ins+1", "missense", "nonsense", "total"]}}
-                                            }
-            
+                                                **{"topology":    {key: [0 for _ in range(100)] for key in ["del-1", "frameshift", "ins+1", "missense", "nonsense", "silent", "total"]}}
+                                                }
+                
 
     def _analyze_probability_trajectories(self, accumulated_probability_trajectory, mutation_type):
         topology = [key for key in self.probability_trajectory if mutation_type in key][0]
@@ -84,6 +84,21 @@ class Mask_predictions():
             plt.plot(np.arange(len(accumulated_probability_trajectory[key])), accumulated_probability_trajectory[key], label=key)
         
         plt.title("accumulated probability trajectory")
+        plt.legend()
+        plt.show()
+
+        # normalize and plot topology
+        for key in self.probability_trajectory["topology"]:
+            value_sum = np.sum(self.probability_trajectory["topology"][key])
+
+            if value_sum > 0:
+                for i in range(len(self.probability_trajectory["topology"][key])):
+                    self.probability_trajectory["topology"][key][i] /= value_sum
+
+            plt.plot(self.probability_trajectory["topology"][key], label=key)
+        
+        plt.title("normalized topology")
+        plt.legend()
         plt.show()
 
 
@@ -344,8 +359,8 @@ class Mask_predictions():
 
     # should be reconsidered under the aspect that for variant predictions, last position of stop codon was used (i+2)
     def calculate_probabilities(self, cds, transcript_id, gene_target, pair_target, variant_targets={}, show=False):
-        prob_stats      = {"del-1": 0, "frameshift": 0, "ins+1": 0, "missense": 0, "nonsense": 0, "total": 0}
-        last_prob_stats = {"del-1": 0, "frameshift": 0, "ins+1": 0, "missense": 0, "nonsense": 0, "total": 0}
+        prob_stats      = {"del-1": 0, "frameshift": 0, "ins+1": 0, "missense": 0, "nonsense": 0, "silent": 0, "total": 0}
+        last_prob_stats = {"del-1": 0, "frameshift": 0, "ins+1": 0, "missense": 0, "nonsense": 0, "silent": 0, "total": 0}
         probabilities   = [np.nan for _ in range(len(cds)-3)]
         
         # in MSK data, on rare occasions deviations can occur between cancer-wise and all cancer runs as for some patients,
@@ -375,7 +390,7 @@ class Mask_predictions():
 
         elif self.params["apply_mutation_weights"] == True: # recheck!
             gene_factor = self.params["mutation_stats_scale"]*self.mutation_stats["genes"][gene_target][transcript_id]
-
+        
         # test for start codon
         if cds[0:3] != "ATG":
             print("< start codon not found @mask_predictions")
@@ -388,7 +403,8 @@ class Mask_predictions():
             hist_index    = int(100*(i-3)/(len(cds)-3))
 
             # detect missense or nonsense candidates
-            if "missense" in self.params["masks"] or "nonsense" in self.params["masks"]:
+            #if "missense" in self.params["masks"] or "nonsense" in self.params["masks"]:
+            if "missense" in self.params["masks"] or "nonsense" in self.params["masks"] or "silent" in self.params["masks"]:
                 for j in range(3):                    
                     for base in ["A", "C", "G", "T"]:
                         triplett    = cds[i:i+3]
@@ -430,6 +446,25 @@ class Mask_predictions():
                                 current_probs[j]       += current_prob
                                 prob_stats["missense"] += current_prob/self.params["mutation_stats_scale"]
                                 if show == True: print("missense-"+str(j+1), i, cds[i:i+3], triplett, gene_factor, "/", current_prob/gene_factor)
+
+                        # added on 251120
+                        if "silent" in self.params["masks"] and triplett not in ["TAA", "TAG", "TGA"] and genetic_code[cds[i:i+3]] == genetic_code[triplett]:
+                            if self.params["apply_mutation_stats"] == False:
+                                current_probs[j] = gene_factor # 1
+                            
+                            else:
+                                if self.params["apply_3mers"] == False:
+                                    current_prob = gene_factor*(self.mutation_stats["pairs"][pair_target][wt_base+base])
+                                    self.probability_trajectory["pairs"][pair_target][wt_base+base][hist_index] += gene_factor*self.mutation_stats["pairs"][pair_target][wt_base+base]
+
+                                if self.params["apply_3mers"] == True:
+                                    current_prob = gene_factor*self.mutation_stats["pairs_3mers"][pair_target][wt_context[0:2]+base+wt_context[2]]
+                                    self.probability_trajectory["pairs_3mers"][pair_target][wt_context[0:2]+base+wt_context[2]][hist_index] += gene_factor*self.mutation_stats["pairs_3mers"][pair_target][wt_context[0:2]+base+wt_context[2]]
+
+                                current_probs[j]     += current_prob
+                                prob_stats["silent"] += current_prob/self.params["mutation_stats_scale"]
+                                if show == True: print("silent-"+str(j+1), i, cds[i:i+3], triplett, gene_factor, "/", current_prob/gene_factor)
+
 
             if "frameshift" in self.params["masks"]:
                 # detect candidates for frameshift -1
@@ -518,12 +553,13 @@ class Mask_predictions():
             last_prob_stats = {key: copy.deepcopy(value) for key, value in prob_stats.items()}
 
 
-            if self.params["apply_mutation_stats"] == True and round(prob_stats["total"], 6) != round(prob_stats["frameshift"]+prob_stats["missense"]+prob_stats["nonsense"], 6):
-                print("< count error1 occurred ("+str(prob_stats["total"])+"/"+str(prob_stats["frameshift"]+prob_stats["missense"]+prob_stats["nonsense"])+")")
+            if (self.params["apply_mutation_stats"] == True
+                and round(prob_stats["total"], 6) != round(prob_stats["frameshift"]+prob_stats["missense"]+prob_stats["nonsense"]+prob_stats["silent"], 6)):
+                print("< count error1 occurred ("+str(prob_stats["total"])+"/"+str(prob_stats["frameshift"]+prob_stats["missense"]+prob_stats["nonsense"]+prob_stats["silent"])+")")
                 print(prob_stats)
 
             if self.params["apply_mutation_stats"] == True and round(prob_stats["frameshift"], 6) != round(prob_stats["del-1"]+prob_stats["ins+1"], 6):
-                print("< count error2 occurred ("+str(prob_stats["total"])+"/"+str(prob_stats["frameshift"]+prob_stats["missense"]+prob_stats["nonsense"])+")")
+                print("< count error2 occurred ("+str(prob_stats["frameshift"]+prob_stats["del-1"]+prob_stats["ins+1"])+")")
                 print(prob_stats)
 
         
@@ -551,6 +587,7 @@ class Mask_predictions():
                                           "ins+1"               : [round(prob_stats["ins+1"], 8)],
                                           "missense"            : [round(prob_stats["missense"], 8)],
                                           "nonsense"            : [round(prob_stats["nonsense"], 8)],
+                                          "silent"            : [round(prob_stats["silent"], 8)],
                                           "proj. del-1"         : [(round(len(self.mutation_stats["cases"][gene_target])
                                                                     *prob_stats["del-1"]/self.mutation_stats["avg. gene factor"][gene_target], 8))],
                                           "proj. frameshift"    : [(round(len(self.mutation_stats["cases"][gene_target])
@@ -561,6 +598,8 @@ class Mask_predictions():
                                                                     *prob_stats["missense"]/self.mutation_stats["avg. gene factor"][gene_target], 8))],
                                           "proj. nonsense"      : [(round(len(self.mutation_stats["cases"][gene_target])
                                                                     *prob_stats["nonsense"]/self.mutation_stats["avg. gene factor"][gene_target], 8))],
+                                          "proj. silent"        : [(round(len(self.mutation_stats["cases"][gene_target])
+                                                                    *prob_stats["silent"]/self.mutation_stats["avg. gene factor"][gene_target], 8))],
                                           })
             
             if self.masking_stats.shape[0] > 0: self.masking_stats = pd.concat([self.masking_stats, masking_stats])
@@ -585,12 +624,13 @@ class Mask_predictions():
                             exit()
 
                         else:
-                            print("< predicted position not recognized @mask_predictions ("+transcript_id+": "+str(pos)+", "+cds[int(pos)-2:int(pos)+1]+"). position masked.")
+                            print("< predicted position not recognized @mask_predictions ("
+                                  +transcript_id+": "+str(pos)+", "+cds[int(pos)-2:int(pos)+1]+"). position masked.")
                             self.errors["position_not_covered"].append(gene_target+","+transcript_id+","+str(pos))
                             #probabilities[int(pos)] = np.nan
                             # mark for later removal
                             removed_index[abs_pos].append(i) # new
-        
+
         # remove by marked index
         for key in variant_targets:
             for abs_pos in removed_index:

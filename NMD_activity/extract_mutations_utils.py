@@ -249,6 +249,26 @@ def create_mutation_stats(cluster, clusters, seqs, params):
                       "Nonsense_Mutation", "Nonstop_Mutation", "Silent", "Splice_Site"] #  
     bases          = ["A", "C", "G", "T"]
 
+
+    # added on 251027 to allow alternative project keys (required for CPTAC-3)
+    if params["external_project_path"] != None:
+        clinical_data       = pd.read_csv(params["external_project_path"], sep="\t")
+        clinical_data.index = clinical_data["cases.case_id"]
+
+        for i, case_id in enumerate(clinical_data["cases.case_id"]):
+            if clinical_data[clinical_data["cases.case_id"] == case_id].drop_duplicates(subset="cases.disease_type").shape[0] > 1:
+                print("< redundant case with deviating disease types")
+                print(i, case_id, clinical_data[clinical_data["cases.case_id"] == case_id]["cases.disease_type"].tolist())
+        
+        init_shape          = clinical_data.shape[0]
+        clinical_data       = clinical_data.drop_duplicates(subset=["cases.case_id"])
+        print("< removal of duplicate cases reduced clinical dataset from", init_shape, "to", clinical_data.shape[0])
+        project_keys        = [*np.unique(clinical_data["cases.disease_type"]).tolist(), "total"]
+
+    else:
+        project_keys        = [*list(cluster.keys()), "total"]
+
+
     # prepare containers
     dubletts = []; tripletts = []; quadrupletts = []
     for base1 in bases:
@@ -261,6 +281,7 @@ def create_mutation_stats(cluster, clusters, seqs, params):
                 for base4 in bases:
                     quadrupletts.append(base1+base2+base3+base4)
     
+    '''
     mutation_stats = {
                       **{"2mers":       {dublett: 0 for dublett in [*dubletts, "total"]}},
                       **{"3mers":       {triplett: 0 for triplett in [*tripletts, "total"]}},
@@ -278,12 +299,41 @@ def create_mutation_stats(cluster, clusters, seqs, params):
                       **{"pairs":       {key: {dublett: 0 for dublett in [*dubletts, "total"]} for key in [*list(cluster.keys()), "total"]}},
                       **{"pairs_3mers": {key: {quadruplett: 0 for quadruplett in [*quadrupletts, "total"]} for key in [*list(cluster.keys()), "total"]}},
                       **{"seq_size":    0}
-                     }    
-    
+                     }
+
     report = {**{project: 0 for project in cluster}, **{"exceeding_positions": 0, "mismatching_frameshift_positions": 0, "mismatching_positions": 0,
                                                         "mismatching_positions+": 0, "mismatching_positions-": 0,
                                                         "sequence_deviations": 0, "total_mutations": 0, 
                                                         "exceeding_transcripts": [], "missing_transcripts": []}}
+    '''
+
+    mutation_stats = {
+                      **{"2mers":       {dublett: 0 for dublett in [*dubletts, "total"]}},
+                      **{"3mers":       {triplett: 0 for triplett in [*tripletts, "total"]}},
+                      **{"bases":       {base: 0 for base in [*bases, "total"]}},
+                      **{"cases":       {key: {} for key in project_keys}},
+                      **{"del-1":       {key: {base: 0 for base in [*bases, "total"]} for key in project_keys}},
+                      **{"del-1_3mers": {key: {triplett: 0 for triplett in [*tripletts, "total"]} for key in project_keys}},
+                      **{"del-1_full":  {key: 0 for key in project_keys}},
+                      **{"genes":       {key: {} for key in project_keys}},
+                      **{"ins+1":       {key: {base: 0 for base in [*bases, "total"]} for key in project_keys}},
+                      **{"ins+1_3mers": {key: {triplett: 0 for triplett in [*tripletts, "total"]} for key in project_keys}},
+                      **{"ins+1_full":  {key: 0 for key in project_keys}},
+                      **{"observed":    {key: {**{mutation: {} for mutation in ["del-1", "frameshift", "ins+1", "missense", "nonsense"]}}
+                                         for key in project_keys}},
+                      **{"pairs":       {key: {dublett: 0 for dublett in [*dubletts, "total"]} for key in project_keys}},
+                      **{"pairs_3mers": {key: {quadruplett: 0 for quadruplett in [*quadrupletts, "total"]} for key in project_keys}},
+                      **{"seq_size":    0}
+                     }   
+    
+    report = {**{project: 0 for project in project_keys}, **{"exceeding_positions": 0, "mismatching_frameshift_positions": 0, "mismatching_positions": 0,
+                                                             "mismatching_positions+": 0, "mismatching_positions-": 0,
+                                                             "sequence_deviations": 0, "total_mutations": 0, 
+                                                             "exceeding_transcripts": [], "missing_transcripts": []}}
+
+    mutation_types = ["Silent", "Missense_Mutation", "Frame_Shift_Del", "Frame_Shift_Ins", "Nonsense_Mutation", "Nonstop_Mutation", "interval"]
+    trajectory     = pd.DataFrame({mutation_type: [0 for _ in range(100)] for mutation_type in mutation_types})    
+
     bar = IncrementalBar(set_bar("creating mutation stats"), max=len(clusters))
     for project_key in cluster:
         if params["projects"] == "all" or project_key in params["projects"]:
@@ -291,13 +341,19 @@ def create_mutation_stats(cluster, clusters, seqs, params):
                 for i in range(len(cluster[project_key][cluster_key]["input"])):
                     for case_id in cluster[project_key][cluster_key]["input"][i]:
                         wxss = []
+                        # added on 251027 to allow alternative project keys (required for CPTAC-3)
+                        if params["external_project_path"] != None:
+                            external_project_key = clinical_data.loc[case_id].loc["cases.disease_type"]
+
+                        else:
+                            external_project_key = project_key
 
                         # load WXS files
                         for j in range(len(cluster[project_key][cluster_key]["input"][i][case_id]["WXS"])):
                             wxs = load_wxs(params["data_dir"]+params["os_sep"]+project_key+params["os_sep"]+"WXS"
                                            +params["os_sep"]+cluster[project_key][cluster_key]["input"][i][case_id]["WXS"][j])
 
-                            report[project_key] += 1
+                            report[external_project_key] += 1 # report[project_key] += 1
                             if wxs.shape[0] > 0: wxss.append(wxs)
 
                         # merge WXS files and apply filters
@@ -356,6 +412,13 @@ def create_mutation_stats(cluster, clusters, seqs, params):
                             if seq_pos < 3 or seq_pos >= seq_size-3:
                                 filters_passed1 = False; filters_passed2 = False
                                 report["exceeding_positions"] += 1
+                            
+                            # register trajectory
+                            if seq_pos >= 3 and seq_pos < seq_size-3:
+                                if wxs.iloc[j].loc["Variant_Classification"] in trajectory.columns:
+                                    pos = int(100*seq_pos/(seq_size-3))
+                                    trajectory.at[pos, wxs.iloc[j].loc["Variant_Classification"]] += 1
+                                    trajectory.at[pos, "interval"]                                += ((pos+1)*(seq_size-3)/100)-((pos)*(seq_size-3)/100)
 
                             # filters for mutations of size 1 only (applies to sequence-specific statistics AND general statistics)
                             if len(ref_base) != 1 or len(alt_base) != 1:
@@ -371,7 +434,6 @@ def create_mutation_stats(cluster, clusters, seqs, params):
 
                                 if wxs.iloc[j].loc["Variant_Classification"] in ["Frame_Shift_Del", "Frame_Shift_Ins"]:
                                     report["mismatching_frameshift_positions"] += 1
-
 
                             # filter to exclude nonsense mutation in order to reduce possible bias (applies to sequence-specific statistics ONLY)
                             if wxs.iloc[j].loc["Variant_Classification"] in ["Nonsense_Mutation", "Nonstop_Mutation"]:
@@ -409,6 +471,11 @@ def create_mutation_stats(cluster, clusters, seqs, params):
                                     if cds[seq_pos] != invert_sequence(ref_base):
                                         report["sequence_deviations"] += 1
 
+                                    if invert_sequence(pre_base+base+post_base) != cds[seq_pos-1:seq_pos+2]:
+                                        print("< inversion error occurred:", invert_sequence(pre_base+base+post_base), "/", cds[seq_pos-1:seq_pos+2])
+                                        exit()
+                                
+                                '''
                                 # SNP mutations
                                 if len(ref_base) == 1 and len(alt_base) == 1 and ref_base in bases and alt_base in bases:
                                     mutation_stats = _create_mutation_stats(mutation_stats, "pairs", project_key, ref_base+alt_base)
@@ -424,6 +491,24 @@ def create_mutation_stats(cluster, clusters, seqs, params):
                                     mutation_stats = _create_mutation_stats(mutation_stats, "ins+1", project_key, alt_base)
                                     if strand == "+": mutation_stats = _create_mutation_stats(mutation_stats, "ins+1_3mers", project_key, base+alt_base+post_base)
                                     if strand == "-": mutation_stats = _create_mutation_stats(mutation_stats, "ins+1_3mers", project_key, pre_base+alt_base+base)
+                                '''
+
+                                # SNP mutations
+                                if len(ref_base) == 1 and len(alt_base) == 1 and ref_base in bases and alt_base in bases:
+                                    mutation_stats = _create_mutation_stats(mutation_stats, "pairs", external_project_key, ref_base+alt_base)
+                                    mutation_stats = _create_mutation_stats(mutation_stats, "pairs_3mers", external_project_key, pre_base+ref_base+alt_base+post_base)
+
+                                # deletion of size 1
+                                if len(ref_base) == 1 and len(alt_base) == 1 and ref_base in bases and alt_base == "-":
+                                    mutation_stats = _create_mutation_stats(mutation_stats, "del-1", external_project_key, ref_base)
+                                    mutation_stats = _create_mutation_stats(mutation_stats, "del-1_3mers", external_project_key, pre_base+ref_base+post_base)
+
+                                # insertion of size 1
+                                if len(ref_base) == 1 and len(alt_base) == 1 and ref_base == "-" and alt_base in bases:
+                                    mutation_stats = _create_mutation_stats(mutation_stats, "ins+1", external_project_key, alt_base)
+                                    if strand == "+": mutation_stats = _create_mutation_stats(mutation_stats, "ins+1_3mers", external_project_key, base+alt_base+post_base)
+                                    if strand == "-": mutation_stats = _create_mutation_stats(mutation_stats, "ins+1_3mers", external_project_key, pre_base+alt_base+base)
+                                    
                                     '''
                                     complementary approach:
                                     mutation_stats = _create_mutation_stats(mutation_stats, "ins+1_3mers", project_key, base+alt_base+post_base)
@@ -431,7 +516,7 @@ def create_mutation_stats(cluster, clusters, seqs, params):
 
                             # create gene-specific statistics
                             # per-gene mutation counts
-                            for key in ["total", project_key]:
+                            for key in ["total", external_project_key]: # for key in ["total", project_key]:
                                 if wxs.iloc[j].loc["Transcript_ID"] in mutation_stats["genes"][key]: 
                                     mutation_stats["genes"][key][wxs.iloc[j].loc["Transcript_ID"]]                  += 1 / seq_size
 
@@ -461,11 +546,14 @@ def create_mutation_stats(cluster, clusters, seqs, params):
                                         mutation_stats["observed"][key]["missense"][wxs.iloc[j].loc["Transcript_ID"]]   += 1
 
                         if len(cluster[project_key][cluster_key]["input"][i][case_id]["WXS"]) > 0:
-                            mutation_stats["cases"]["total"][case_id]     = wxs.shape[0]
-                            mutation_stats["cases"][project_key][case_id] = wxs.shape[0]
+                            mutation_stats["cases"]["total"][case_id]              = wxs.shape[0]
+                            mutation_stats["cases"][external_project_key][case_id] = wxs.shape[0] # mutation_stats["cases"][project_key][case_id] = wxs.shape[0]
 
                 bar.next()
     bar.finish()
+
+    # print trajectory
+    trajectory.to_csv(params["run_dir"]+params["os_sep"]+params["fname"].split(".")[0]+"_trajectory.txt", index=False, sep=",")
 
 
     # print report
@@ -509,7 +597,6 @@ def create_mutation_stats(cluster, clusters, seqs, params):
         for key2 in test_total1:
             if test_total1[key2] != mutation_stats[key1]["total"][key2]:
                 print("< mismatching counts2 @"+key1+"/"+key2+" ("+str(test_total1[key2])+"/"+str(mutation_stats[key1]["total"][key2])+")")
-
 
     # get base statistics from full sequences and aggregate sequence sizes
     bar = IncrementalBar(set_bar("retrieving base statistics"), max=len(mutation_stats["genes"]["total"]))
@@ -620,7 +707,6 @@ def create_mutation_stats(cluster, clusters, seqs, params):
                    
             mutation_stats["pairs_3mers"][key] = pairs_3mers
 
-    
     # normalize bases/pairs to base counts
     for key in mutation_stats["pairs"]:
         for pair in mutation_stats["pairs"][key]:
@@ -679,11 +765,12 @@ def create_mutation_stats(cluster, clusters, seqs, params):
             if value_sum != mutation_stats[key1]["total"]:
                 print("< error. mismatching probabilities @"+key1+" ("+str(value_sum)+"/"+str(mutation_stats[key1]["total"])+")")
 
-        else:
-            for key2 in mutation_stats[key1]:
-                value_mean = np.mean([mutation_stats[key1][key2][key3] for key3 in mutation_stats[key1][key2] if key3 != "total"])
-                if value_mean != mutation_stats[key1][key2]["total"]:
-                    print("< mismatching probabilities @"+key1+"/"+key2+" ("+str(value_mean)+"/"+str(mutation_stats[key1][key2]["total"])+")")
+        # removed on 251120 as not mathematically sound (a/A+b/B+c/C+d/D != (a+b+c+d)/(A+B+C+D))
+        #else:
+        #    for key2 in mutation_stats[key1]:
+        #       value_mean = np.mean([mutation_stats[key1][key2][key3] for key3 in mutation_stats[key1][key2] if key3 != "total"])
+        #        if value_mean != mutation_stats[key1][key2]["total"]:
+        #            print("< mismatching probabilities @"+key1+"/"+key2+" ("+str(value_mean)+"/"+str(mutation_stats[key1][key2]["total"])+")")
 
     # additional plausibility checks
     for key1 in ["del-1", "ins+1", "pairs"]:
@@ -703,6 +790,7 @@ def evaluate_mutation_stats(mutation_stats, seqs, params):
     mp = Mask_predictions({**params,
                            **{"apply_3mers"                  : True,
                               "apply_mutation_stats"         : True,
+                              "apply_mutation_weights"       : False,
                               "mutation_stats_scale"         : 1}},
                            mutation_stats)
     
@@ -890,7 +978,8 @@ def extract_rnaseq(cluster, data, project_key, cluster_key, params, lock):
                     rna = load_rna(params["data_dir"]+params["os_sep"]+project+params["os_sep"]+params["transform_type"]
                                    +params["os_sep"]+cluster[project_key][cluster_key]["input"][i][case_id]["RNA"][j], params)
 
-                rna["gene_id"] = [rna.iloc[k].loc["gene_id"] if "PAR_Y" in rna.iloc[k].loc["gene_id"] else rna.iloc[k].loc["gene_id"].split(".")[0] for k in range(rna.shape[0])]
+                rna["gene_id"] = [rna.iloc[k].loc["gene_id"] if "PAR_Y" in rna.iloc[k].loc["gene_id"]
+                                  else rna.iloc[k].loc["gene_id"].split(".")[0] for k in range(rna.shape[0])]
                                 
                 # filter rna for non-negative values if transformed data are used since these can arise from transformation
                 if params["transform_type"] != None and rna.shape[0] > 0:
@@ -953,13 +1042,8 @@ def extract_rnaseq(cluster, data, project_key, cluster_key, params, lock):
 
                     if ptc_test == 0 or ptc_test == len(is_ptc):
                         for rnacol in multiple_seqs:
-                            if is_ptc[0] == False:
-                                #data.at[k, "RNASEQ_noptc_"+rnacol].append(multiple_seqs[rnacol])
-                                data.at[data.index[k], "RNASEQ_noptc_"+rnacol].append(multiple_seqs[rnacol])
-
-                            else:
-                                #data.at[k, "RNASEQ_ptc_"+rnacol].append(multiple_seqs[rnacol])
-                                data.at[data.index[k], "RNASEQ_ptc_"+rnacol].append(multiple_seqs[rnacol])
+                            if is_ptc[0] == False: data.at[data.index[k], "RNASEQ_noptc_"+rnacol].append(multiple_seqs[rnacol])
+                            else:                  data.at[data.index[k], "RNASEQ_ptc_"+rnacol].append(multiple_seqs[rnacol])
 
                     else:
                         print("exception. ptc status is unambiguous.")
@@ -1171,6 +1255,28 @@ def init_cluster(status, params, project_key=None, cluster_key=None):
                 cluster[project_key][cluster_key] = {"input": [{case_id: status["file_ids"][project][case_id]}], "project": project, "data": pd.DataFrame()}
 
     return cluster
+
+
+# <- added on 251024 to allow random clusters (for efficient calculation)
+def randomize_cluster(cluster, max_procs):
+    pseudo_clusters    = ["random_cluster"+str(i) for i in range(max_procs)]
+    randomized_cluster = {project_key: {pseudo_cluster: {"input": [], "project": "", "data": pd.DataFrame()}
+                                        for pseudo_cluster in pseudo_clusters} for project_key in cluster}
+    random.seed(int(time.time()))
+
+    for project_key in cluster:
+        for cluster_key in cluster[project_key]:
+            for case in cluster[project_key][cluster_key]["input"]:
+                pseudo_cluster = pseudo_clusters[int(max_procs*random.random())]
+                randomized_cluster[project_key][pseudo_cluster]["input"].append(case)
+                randomized_cluster[project_key][pseudo_cluster]["project"] = project_key
+                #print(project_key, cluster_key, pseudo_cluster, len(cluster[project_key][cluster_key]), "/", len(randomized_cluster[project_key][pseudo_cluster]))
+
+    for project_key in randomized_cluster:
+        for cluster_key in randomized_cluster[project_key]:
+            print(project_key, cluster_key, len(randomized_cluster[project_key][cluster_key]["input"]))
+
+    return randomized_cluster
 
 
 def load_df(path, delimiter="\t"):

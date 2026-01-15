@@ -20,10 +20,6 @@ class Prepare_mskcc_utils():
     def _adjust_to_ptcs(self, adjusted_data, subset1, subset2, cancer_type, it):
         subset1_ptcs = self.create_ptcs(subset1)
         subset2_ptcs = self.create_ptcs(subset2)
-
-        #print("subset1_ptcs", {key: len(subset1_ptcs[key]) for key in subset1_ptcs})
-        #print("subset2_ptcs", {key: len(subset2_ptcs[key]) for key in subset2_ptcs})
-
         # remove mutations not present in either dataset
         # only required for subset1 as dataset is built later based on subset1 only (subset2-specific counts are not considered)
         for ptc_count in subset1_ptcs:
@@ -274,22 +270,30 @@ class Prepare_mskcc_utils():
 
 
     # <- function added on 250616 to filter out downstream PTC mutations of PTC variants with existing mutations
+    # <- changed on 251114 from ID:patient id to ID:sample id as samples always reflect different cancer types and can thus be considered independent
     def filter_mutations(self, mutations):
-        mutations = mutations.sort_values(["ID:patient id", "ID:transcript id", "FEATURE:ptc cds position"])
-        blocks    = create_blocks(mutations, ["ID:patient id", "ID:transcript id", "FEATURE:ptc cds position"])
+        mutations = mutations.sort_values(["ID:sample id", "ID:transcript id", "FEATURE:ptc cds position"])
+        blocks    = create_blocks(mutations, ["ID:sample id", "ID:transcript id"])
+        #blocks    = create_blocks(mutations, ["ID:patient id", "ID:transcript id", "FEATURE:ptc cds position"])
 
         filtered_mutations = {col: [] for col in mutations.columns}
         bar = IncrementalBar(set_bar("filtering mutations"), max=len(blocks))
         for i in range(len(blocks)):
-            for col in mutations.columns:
-                filtered_mutations[col].append(mutations.iloc[blocks[i]["index"][0]].loc[col])
+            if mutations.iloc[blocks[i]["index"][0]].loc["FEATURE:ptc cds position"] == mutations.iloc[blocks[i]["index"]]["FEATURE:ptc cds position"].min():
+                for col in mutations.columns:
+                    filtered_mutations[col].append(mutations.iloc[blocks[i]["index"][0]].loc[col])
+
+            else:
+                print("< error occurred @filter_mutations. selected PTC cds position is not most upstream")
+                print(mutations.iloc[blocks[i]["index"][0]].loc["FEATURE:ptc cds position"], "/", mutations.iloc[blocks[i]["index"]].loc["FEATURE:ptc cds position"].tolist())
+                exit()
 
             if len(blocks[i]["index"]) > 1:
                 tests = []
                 for j in range(len(blocks[i]["index"])):
-                    tests.append((mutations.iloc[blocks[i]["index"][j]].loc["ID:patient id"]
-                                 +"_"+mutations.iloc[blocks[i]["index"][j]].loc["ID:transcript id"]
-                                 +"_"+str(mutations.iloc[blocks[i]["index"][j]].loc["FEATURE:ptc cds position"])))
+                    tests.append((mutations.iloc[blocks[i]["index"][j]].loc["ID:sample id"]
+                                 +"_"+mutations.iloc[blocks[i]["index"][j]].loc["ID:transcript id"]))
+                                 #+"_"+str(mutations.iloc[blocks[i]["index"][j]].loc["FEATURE:ptc cds position"])))
 
                 if np.unique(tests).shape[0] != 1:
                     print("< dimension error occurred @filter_mutations")
@@ -300,16 +304,19 @@ class Prepare_mskcc_utils():
         bar.finish()
 
         filtered_mutations = pd.DataFrame(filtered_mutations)
-        print("< filtering removed mutations from", mutations.shape[0], "to", filtered_mutations.shape[0])
+
+        if filtered_mutations.drop_duplicates(subset=["ID:sample id", "ID:transcript id"]).shape[0] != filtered_mutations.shape[0]:
+            print("< error occurred.", filtered_mutations.shape[0]-filtered_mutations.drop_duplicates(subset=["ID:sample id", "ID:transcript id"]).shape[0],
+                  "downstream ptcs could not be removed.")
+            exit()
+
+        else:
+            print("< filtering removed mutations from", mutations.shape[0], "to", filtered_mutations.shape[0])
+
         return filtered_mutations
 
 
-    def filter_samples(self, sample_data, reference_sample_data=pd.DataFrame()):
-        if reference_sample_data.shape[0] > 0:
-            init_shape  = sample_data.shape[0]
-            sample_data = sample_data[~sample_data["PATIENT_ID"].isin(reference_sample_data["PATIENT_ID"])]
-            print("< reference filtering reduced sample data from", init_shape, "to", sample_data.shape[0])
-
+    def filter_samples(self, sample_data):
         sample_data = sample_data.sort_values(by=["PATIENT_ID"])
         sample_data = sample_data.reset_index()
         blocks      = create_blocks(sample_data, ["PATIENT_ID"])
@@ -356,6 +363,7 @@ class Prepare_mskcc_utils():
         return sample_data
 
 
+    # <- alternative function created on 251028 (_prepare_analysis_from_ptcs)
     def _prepare_analysis(self, sample_data, mutations):
         # rename columns
         updated_cols = {}
@@ -393,7 +401,6 @@ class Prepare_mskcc_utils():
                 values = [get_frameshift(selected_mutations.iloc[j].loc["HGVSp"]) for j in range(selected_mutations.shape[0])
                           if type(selected_mutations.iloc[j].loc["HGVSp"]) == str and "?" not in selected_mutations.iloc[j].loc["HGVSp"]
                              and len(selected_mutations.iloc[j].loc["HGVSp"].split("Ter")) == 2]
-                # and len(selected_mutations.iloc[j].loc["HGVSp"].split("Ter")) == 2 needs to be re-considered might exclude Nonsense Variants!
 
                 # remove None values
                 values = [value for value in values if pd.isna(value) == False]
@@ -441,22 +448,96 @@ class Prepare_mskcc_utils():
               ", existing prediction values", sample_data[~sample_data["FEATURE:prediction"].isna()].shape[0])
 
         return sample_data
+    
+
+    def _prepare_analysis_from_ptcs(self, sample_data, ptcs):
+        # rename columns
+        updated_cols = {}
+        for col in sample_data.columns:
+            if col in self.params["label_ids"]:         updated_cols[col] = "LABEL:"+col
+            elif col in self.params["feature_targets"]: updated_cols[col] = "FEATURE:"+col
+            else:                                       updated_cols[col] = "ID:"+col
+
+        sample_data = sample_data.rename(columns=updated_cols)
+
+        # add categories
+        ptcs["index"] = [i for i in range(ptcs.shape[0])]
+        mapped_index  = append_df_with_mapping([sample_data, ptcs], "ID:SAMPLE_ID", "ID:sample id", "index",
+                                                set_bar("mapping MSK data"), non_redundant=False, reverse=True)
+        
+        extracted_mutations = {**{"FEATURE:expression":             [None for _ in mapped_index]},
+                               **{"FEATURE:frameshift":             [None for _ in mapped_index]},
+                               **{"FEATURE:frameshift_mutations":   [None for _ in mapped_index]},
+                               **{"FEATURE:escape":                 [None for _ in mapped_index]},
+                               **{"FEATURE:prediction":             [None for _ in mapped_index]},
+                               **{"FEATURE:target":                 [None for _ in mapped_index]},
+                               **{"FEATURE:ptc_mutations":          [None for _ in mapped_index]}}
+
+        bar = IncrementalBar(set_bar("processing mutation data"), max=len(mapped_index))
+        for i in range(len(mapped_index)):
+            selected_ptcs = ptcs.iloc[[int(j) for j in mapped_index[i]]]
+            selected_ptcs = selected_ptcs[selected_ptcs["ID:variant classification"].isin(["Frame_Shift_Del", "Frame_Shift_Ins", "Nonsense_Mutation"])]
+
+            if selected_ptcs.shape[0] > 0:
+                extracted_mutations["FEATURE:expression"][i]           = selected_ptcs["expression"].mean()
+                extracted_mutations["FEATURE:frameshift"][i]           = selected_ptcs["FEATURE:frameshift"].mean()
+                extracted_mutations["FEATURE:frameshift_mutations"][i] = selected_ptcs["FEATURE:frameshift_mutations"].mean()
+                
+                # predictions
+                scores = [selected_ptcs.iloc[j].loc["FEATURE:prediction"] for j in range(selected_ptcs.shape[0])
+                          if pd.isna(selected_ptcs.iloc[j].loc["FEATURE:prediction"]) == False]
+
+                if len(scores) > 0:
+                    extracted_mutations["FEATURE:escape"][i]     = self.count_by_threshold(scores, self.params["score_threshold"]["FEATURE:escape"]) / len(scores)
+                    extracted_mutations["FEATURE:prediction"][i] = np.mean(scores)
+                    extracted_mutations["FEATURE:target"][i]     = self.count_by_threshold(scores, self.params["score_threshold"]["FEATURE:target"]) / len(scores)
+
+                elif self.params["zeros_included"] == True:
+                    extracted_mutations["FEATURE:escape"][i]     = 0
+                    extracted_mutations["FEATURE:target"][i]     = 0
+
+                
+            elif self.params["zeros_included"] == False:
+                # default values should be consistent with settings for analyze_targets
+                extracted_mutations["FEATURE:frameshift_mutations"][i] = 0
+
+            elif self.params["zeros_included"] == True:
+                extracted_mutations["FEATURE:escape"][i]               = 0
+                extracted_mutations["FEATURE:expression"][i]           = 0
+                extracted_mutations["FEATURE:frameshift"][i]           = 0
+                extracted_mutations["FEATURE:frameshift_mutations"][i] = 0
+                extracted_mutations["FEATURE:target"][i]               = 0
+
+            extracted_mutations["FEATURE:ptc_mutations"][i] = selected_ptcs.shape[0]
+            
+            bar.next()
+        bar.finish()
+
+        for feature in extracted_mutations:
+            if None not in extracted_mutations[feature]: print(feature, np.mean(extracted_mutations[feature]))
+            sample_data.insert(sample_data.shape[1], feature, extracted_mutations[feature])
+
+        print("< total values", sample_data.shape[0],
+              ", existing frameshifts", sample_data[~sample_data["FEATURE:frameshift"].isna()].shape[0],
+              ", existing prediction values", sample_data[~sample_data["FEATURE:prediction"].isna()].shape[0])
+
+        return sample_data
 
 
     # preparation of data from folder: tmb_mskcc_2018, files: data_clinical_sample_edited.txt, data_mutations_appended.txt, and TCGA_expressions.txt
-    def prepare_analysis(self, sample_data, mutations):
+    def prepare_analysis(self, sample_data, ptcs):
         if self.params["cancer_wise"] == True:
             cancer_types     = sample_data.drop_duplicates(subset="CANCER_TYPE")["CANCER_TYPE"].tolist()
             full_sample_data = sample_data
 
             for cancer_type in cancer_types:
                 sample_data           = full_sample_data[full_sample_data["CANCER_TYPE"] == cancer_type]
-                processed_sample_data = self._prepare_analysis(full_sample_data, mutations)
+                processed_sample_data = self._prepare_analysis_from_ptcs(full_sample_data, ptcs)
                 processed_sample_data = get_random_cohorts(processed_sample_data, self.params["cohorts"], targets=["ID:PATIENT_ID"])
                 processed_sample_data.to_csv(path_or_buf=self.params["data_dir"]+self.params["os_sep"]+self.params["outfname"].split(".")[0]+"_"+cancer_type.lower().replace(" ", "_")+".txt", sep=",", index=False)
 
         else:
-            processed_sample_data = self._prepare_analysis(sample_data, mutations)
+            processed_sample_data = self._prepare_analysis_from_ptcs(sample_data, ptcs)
             processed_sample_data = get_random_cohorts(processed_sample_data, self.params["cohorts"], targets=["ID:PATIENT_ID"])
             processed_sample_data.to_csv(path_or_buf=self.params["data_dir"]+self.params["os_sep"]+self.params["outfname"], sep=",", index=False)
 
@@ -492,12 +573,12 @@ class Prepare_mskcc_utils():
 
             # check cancer type
             if processed_patient_data.iloc[i].loc["ID:CANCER_TYPE"] != filtered_sample_data.iloc[0].loc["CANCER_TYPE"]:
-                print("< cancer type error occurred @", i, processed_patient_data.iloc[i].loc["ID:PATIENT_ID"],
+                print("< cancer type error occurred @test_patient_data", i, processed_patient_data.iloc[i].loc["ID:PATIENT_ID"],
                       processed_patient_data.iloc[i].loc["ID:CANCER_TYPE"], "/", filtered_sample_data.iloc[0].loc["CANCER_TYPE"])
 
             # check sample type
             if processed_patient_data.iloc[i].loc["ID:SAMPLE_TYPE"] != filtered_sample_data.iloc[0].loc["SAMPLE_TYPE"]:
-                print("< cancer type error occurred @", i, processed_patient_data.iloc[i].loc["ID:PATIENT_ID"],
+                print("< cancer type error occurred @test_patient_data", i, processed_patient_data.iloc[i].loc["ID:PATIENT_ID"],
                       processed_patient_data.iloc[i].loc["ID:SAMPLE_TYPE"], "/", filtered_sample_data.iloc[0].loc["SAMPLE_TYPE"])
 
             # check treatment features
@@ -518,7 +599,6 @@ class Prepare_mskcc_utils():
                         feature_values[key] = 0
 
             if selected_mutations.shape[0] > 0:
-                #print(selected_mutations["FEATURE:prediction"].tolist())
                 feature_values["expression"]           = selected_mutations["expression"].mean()
                 values                                 = [get_frameshift(selected_mutations.iloc[j].loc["HGVSp"]) for j in range(selected_mutations.shape[0])
                                                           if type(selected_mutations.iloc[j].loc["HGVSp"]) == str and "?" not in selected_mutations.iloc[j].loc["HGVSp"]
@@ -563,10 +643,10 @@ class Prepare_mskcc_utils():
 
                 if selected_treatment.shape[0] > 0:
                     if "Immuno" in selected_treatment["SUBTYPE"].tolist() and mutations.iloc[i].loc["ID:subtype"] != "Immuno":
-                        print("< error1 occurred @", i, mutations.iloc[i].loc[sample_col])
+                        print("< error1 occurred @test_ptcs", i, mutations.iloc[i].loc[sample_col])
 
                     if "Immuno" not in selected_treatment["SUBTYPE"].tolist() and mutations.iloc[i].loc["ID:subtype"] == "Immuno":
-                        print("< error2 occurred @", i, mutations.iloc[i].loc[sample_col])
+                        print("< error2 occurred @test_ptcs", i, mutations.iloc[i].loc[sample_col])
 
             if pd.isna(mutations.iloc[i].loc["ID:subtype"]) == False and mutations.iloc[i].loc[patient_col] not in treatment["PATIENT_ID"].tolist():
                 print("< error3 occurred @", i, mutations.iloc[i].loc[sample_col])

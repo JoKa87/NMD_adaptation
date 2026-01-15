@@ -127,6 +127,7 @@ def evaluate(targets, params):
 
         balanced_df, _ = balance(pd.DataFrame({"label": results[result]["labels"], "prediction": results[result]["predictions"]}),
                                                "label", threshold=decision_threshold, randomize=True)
+        # could theoritically lead to errors if labels contain None values (excluded for Teran and Cuomo data)
         cat_labels     = [1 if balanced_df.iloc[i].loc["label"] >= decision_threshold else 0 for i in range(balanced_df.shape[0])]
 
         auroc          = metrics.roc_auc_score(cat_labels, balanced_df["prediction"].tolist())

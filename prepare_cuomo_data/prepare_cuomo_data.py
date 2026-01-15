@@ -1,19 +1,21 @@
-from multiprocessing import Process, Lock
 import os
 import pandas as pd
+from progress.bar import IncrementalBar
+# marked (<-) added on 250427 to allow integration of hg38 in combination with liftover
+from pyliftover import LiftOver # <-
 import sys
-parent_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
-sys.path.insert(0, parent_dir+"\\shared")
+import time
 
-from evaluation_utils import *
-from prepare_cuomo_data_utils import *
-from shared_utils import *
+parent_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
+sys.path.insert(0, parent_dir+"\\prepare_data")
+
+from prepare_data_utils import *
         
 
 # parameters
 params = {
-         "data_dir1"             : parent_dir+r"\data",
-         "data_dir2"             : parent_dir+r"\data\ase_aggregated_by_donor_open_access_lines", # external data from Cuomo et al.
+         "data_dir1"             : r"C:\Programming\Translational_genomics\NMD_analysis\data",
+         "data_dir2"             : r"C:\Programming\Translational_genomics\NMD_analysis\cuomo_et_al\ase_aggregated_by_donor_open_access_lines",
          # <- added on 250616 from prepare_data
          "error_handling"        : { # defines handling of errors during sequence information extraction (True means excluding errors)
                                     "chromosome_incompatible"         : True, # in absolute mode, alternative chromosomes cannot be used
@@ -81,7 +83,7 @@ params = {
          "hg_build"              : "hg19", # "hg19" "hg38"
          "max_procs"             : 1,
          "min_reads"             : 1, # refers to minimum total reads (>=)
-         "mode"                  : "calculation", # "calculation", "evaluation", "filtering"
+         "mode"                  : "evaluation", # "calculation", "evaluation", "filtering"
          "motifs"                : {
                                     "start": ["ATG"],
                                     "GC":    ["G", "C"]
@@ -93,7 +95,7 @@ params = {
          "overwrite"             : False,
          "pattern_cutoff"        : 5,
          "ptc_mode"              : "absolute",
-         "run_dir"               : parent_dir+r"\data",
+         "run_dir"               : r"C:\Programming\Translational_genomics\NMD_analysis\cuomo_et_al\ptc_variants_hg19",
          # if selected_features = [], only specified features are stored (relevant for non-ptc variant extraction)
          "selected_features"     : ["ID:variant id", "ID:gene id", "ID:transcript id", "ID:gene symbol", "ID:uc id", "ID:cell id", "ID:sample id", # removed "ID:alt. variant id", "ID:isoform count",
                                     "ID:appris annotation", "ID:mutation type",

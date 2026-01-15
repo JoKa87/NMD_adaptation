@@ -13,19 +13,20 @@ from extract_expressions_utils import *
 params = {
             "cluster_key"                : None, # "Firehouse", None # if None, calculation is conducted project-wise only and not cluster-resolved
             "data_dir"                   : parent_dir+r"data", # here, TCGA data should be located
-            "file_tag"                   : "_tcga_expressions",
+            "file_tag"                   : "_TCGA_expressions",
             "max_procs"                  : 9,
             "mode"                       : "calculate_full_stats", # "calculate_full_stats" "create_dataset"
             "os_sep"                     : "//",
-            "processed_fname"            : "tcga_avg_expressions.txt",
+            "prediction_fnames"          : ["hg38_NMD_scores_appended.txt"],
+            "processed_fname"            : "TCGA_expressions.txt",
             "projects"                   : "all", # "all"
             "rna_identifier"             : "gene_id",
             "rna_targets"                : ["fpkm_unstranded", "tpm_unstranded"], # "unstranded", "stranded_first", "stranded_second", "tpm_unstranded", , "fpkm_uq_unstranded"
             "rna_threshold"              : 0,
             "run_dir"                    : parent_dir+r"data",
             "status_fname"               : "filtered_status_ptc.json", # "filtered_status_with_sclc.json", "filtered_extracted_status.json"
-            "template_fname"             : "tcga_rna_example", # examplary TCGA expression file located in run_dir (loaded once to invoke format)
-            "transform_type"             : "RNA_ccorr_ptc", # folder for CNV-corrected (if chosen) PTC variants, extracted from TCGA
+            "template_fname"             : "TCGA_rna_example",
+            "transform_type"             : "RNA_ccorr_ptc",
             "verbose"                    : True
         }
 
@@ -105,6 +106,8 @@ def main():
                 else:                stats["mean_"+rna_target].append(None)
                 if len(medians) > 0: stats["median_"+rna_target].append(np.mean(medians))
                 else:                stats["median_"+rna_target].append(None)
+
+                #print("i", i, len(means), len(medians), [col for col in data[0].columns if "median" in col])
                 if i % 100 == 0: bar.next()
 
         for key in stats:

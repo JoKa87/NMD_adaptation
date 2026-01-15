@@ -6,15 +6,18 @@ from extract_mutations_utils import *
 
 parent_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
 
+
 # parameters
 params = {
-            "aggregate_dataset"   : True,
-            "calculate_complements": False, # <- added on 250623
+            "aggregate_dataset"   : False,
+            "calculate_complements": True, # <- added on 250623
             "cnv_threshold"       : -1, # -1 to exclude misses (CNV data contained in RNA_c)
             "create_calculations" : False,
             "create_dataset"      : False,
-            "create_mutation_stats": False, # <- added on 250603
+            "create_mutation_stats": True, # <- added on 250603
             "data_dir"            : parent_dir+r"\data", # TCGA must be located here
+            # added on 251027 to allow alternative project keys (required for CPTAC-3), None to switch off
+            "external_project_path": None, # r"C:\Programming\Translational_genomics\NMD_analysis\data\cptac3_clinical.tsv",
             "extraction_stages"   : ["ptc_variants"], # "ptc_variants" "rnaseq" "calculations"
             # full_extraction allows extraction of all mutations with columns specified in extraction_targets (empty list means all values are extracted)
             "extraction_targets"  : {"Hugo_Symbol": [], "Gene": [], "Transcript_ID": [], "case_id": [], # identifiers
@@ -24,7 +27,7 @@ params = {
                                      "Variant_Classification": ["In_Frame_Ins", "Frame_Shift_Del", "Frame_Shift_Ins",
                                                                 "Missense_Mutation", "Nonsense_Mutation", "Silent",
                                                                 "Splice_Site", "In_Frame_Del", "Nonstop_Mutation"]},
-            "fname"               : "tcga_nmd_mutations.txt",
+            "fname"               : "mutation_stats_test.txt",
             "get_mutation_info"   : False, # if True all mutations for the given PTC variant are extracted
             "ids"                 : [
                                     "variant_id", # unique variant identifier according to Teran et al.
@@ -41,15 +44,17 @@ params = {
                                              "RNASEQ_ptc_cnv_total", "RNASEQ_ptc_cnv_minor", "RNASEQ_ptc_cnv_avg" # from rnaseq data
                                             ]
                                     },
-            "masks"               : ["nonsense", "frameshift", "missense"], # "frameshift" "nonsense" [] <- added on 250618
-            "max_procs"           : 4,
+            "masks"               : ["nonsense", "frameshift", "missense", "silent"], # "frameshift" "nonsense" [] <- added on 250618
+            "max_procs"           : 1,
             # full_extraction allows extraction of all mutations with columns specified in extraction_targets
             # with use_targets=True, ptc_extraction still allows extraction of specified mutations
             # full_extraction does not involve further processing steps of PTC mutation info
             "mode"                : "ptc_extraction", # "full_extraction" "ptc_extraction"
+            "mutation_stats_ptc_weights": False, # <- added on 251025
             "mutation_targets"    : {},
             "os_sep"              : "//",
-            "projects"            : "all", # "all" or list of projects
+            "projects"            : "all", # ["TCGA-BRCA"], # "all" or list of projects ["TCGA-CHOL", "TCGA-LAML"]
+            "randomize_cluster"   : True, # <- added on 251024
             "rna_calculation"     : ["avg", "avg", "avg"], # "median" in Lindeboom et al. 2016
             "rna_criterion"       : "tpm_unstranded",
             "rna_noptc_criterion" : "noptc_tpm_unstranded",
@@ -63,13 +68,13 @@ params = {
                                      "RNASEQ_ptc_cnv_total", "RNASEQ_ptc_cnv_minor", "RNASEQ_ptc_cnv_avg" # RNASEQ_cnv_total is cnv read-out, -1 means cnv status unknown
                                     ],
             "run_dir"             : parent_dir+r"\data",
-            "seq_fname"           : "hg38_seqs.txt", # <- added on 250618
-            "status_fname"        : "tcga_data_info.json",
-            "target_fname"        : "NMD_machinery.txt", # list of targets must be specified here
+            "seq_fname"           : "hg38_seqs_appended.txt", # <- added on 250618
+            "status_fname"        : "filtered_status_ptc.json", # "filtered_status_cpatc3.json", "filtered_status_with_sclc.json", "filtered_extracted_status.json" "filtered_status_ptc.json" 
+            "target_fname"        : "test_genes.txt",
             "target_identifier"   : {"rna": "gene_id", "wxs": "Gene"},
             "targets"             : [],
             "transform_type"      : "RNA_c_ptc", # if not None, transformed rna-seq data are used
-            "use_targets"         : True,
+            "use_targets"         : False,
             "wxs_cols"            : [],
             "wxs_identifier"      : "Transcript_ID" # wxs column that is used to create variant id and conduct ptc checks
         }
@@ -87,7 +92,6 @@ the following WXS file columns that are currently not used in post-processing tr
 137 PUBMED
 155 GDC_FILTER
 '''
-
 
 def get_clusters_(cluster, params):
     clusters = []
@@ -138,8 +142,10 @@ def main():
         status  = load_status(params, fname=params["status_fname"])
 
         # initialize cluster dictionary
-        cluster = init_cluster(status, params, cluster_key="Firehouse")
+        cluster = init_cluster(status, params, cluster_key="firehouse")
         cluster = filter_cluster(cluster, filter_mode="rna_and_wxs_present")
+        # <- added on 251024
+        if params["randomize_cluster"] == True: cluster = randomize_cluster(cluster, params["max_procs"])
 
         # load target filenames (if selected)
         if params["use_targets"] == True:
@@ -159,6 +165,8 @@ def main():
 
         # initialize cluster dictionary
         cluster = init_cluster(status, params, cluster_key="Firehouse")
+        # <- added on 251024 (max_procs must match the no. of randomized clusters during calculation)
+        if params["randomize_cluster"] == True: cluster = randomize_cluster(cluster, params["max_procs"])
 
         # create cluster list
         clusters = get_clusters_(cluster, params)
@@ -174,7 +182,7 @@ def main():
         # conduct calculations
         df = calculate_expression(df, params)
 
-        # print calculted dataframe
+        # print calculated dataframe
         df.to_csv(params["run_dir"]+params["os_sep"]+params["fname"].replace("TCGA_", "TCGA_calculated_"), index=False, sep="\t") #TCGA_calculated_ptc_variants2.txt
 
 

@@ -9,10 +9,10 @@ from sklearn.inspection import permutation_importance # <-
 from sklearn.model_selection import GridSearchCV # <-
 from sklearn import tree
 from sklearn.tree import DecisionTreeRegressor
+import xgboost as xgb
 
 from create_genome_predictions import *
 from forestNMD_utils import *
-
 
 parent_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
 
@@ -20,54 +20,61 @@ parent_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
 def __init_model__(mode="fast"):
     if mode == "fast_class":
         model = RandomForestClassifier(
-                                       criterion="gini",
-                                       n_estimators=100,
-                                       bootstrap=True,
-                                       max_features="sqrt",
-                                       min_samples_leaf=2,
-                                       min_samples_split=2,
-                                       n_jobs=8,
-                                       random_state=0
-                                      )
+                                    criterion="gini",
+                                    n_estimators=100,
+                                    bootstrap=True,
+                                    max_features="sqrt",
+                                    min_samples_leaf=2,
+                                    min_samples_split=2,
+                                    n_jobs=8,
+                                    random_state=0
+                                    )
         
     if mode == "slow_class":
         model = RandomForestClassifier(
-                                       criterion="gini",
-                                       n_estimators=10000,
-                                       bootstrap=True,
-                                       max_features="sqrt",
-                                       min_samples_leaf=50,
-                                       min_samples_split=50,
-                                       n_jobs=9,
-                                       random_state=42
-                                      )
-        
-    if mode == "fast":
-        model = RandomForestRegressor(
-                                      criterion="squared_error",
-                                      n_estimators=100,
-                                      bootstrap=True,
-                                      max_samples=500,
-                                      n_jobs=8,
-                                      )
-        
-    if mode == "slow":        
-        model = RandomForestRegressor(
                                       n_estimators=10000,
                                       max_features=3,
                                       min_samples_leaf=10,
                                       min_samples_split=30,
                                       n_jobs=8,
                                      )
+        
+    if mode == "fast":
+        model = RandomForestRegressor(
+                                    criterion="squared_error",
+                                    n_estimators=100,
+                                    bootstrap=True,
+                                    max_samples=500,
+                                    n_jobs=8,
+                                    )
+        
+    if mode == "slow":
+        # initialized with default values from r package (with the exception of max_features set to '1', see Lindeboom et al. 2020)
+
+        model = RandomForestRegressor(
+                                     n_estimators=10000,
+                                     max_features=3,
+                                     min_samples_leaf=10,
+                                     min_samples_split=30,
+                                     n_jobs=8,
+                                     )
+        
+
+    if mode == "xgboost":
+        model = xgb.XGBClassifier(
+                                  eta=0.5,
+                                  max_depth=3,
+                                  tree_method="hist"
+                                 )
 
         
     if mode == "decision_tree":
         model = DecisionTreeRegressor(
-                                      criterion="squared_error",
-                                      max_features="sqrt",
-                                      min_samples_leaf=50,
-                                      min_samples_split=50,
-                                     )
+                                    criterion="squared_error",
+                                    max_features="sqrt",
+                                    min_samples_leaf=50,
+                                    min_samples_split=50,
+                                    )
     return model
 
 
@@ -95,6 +102,7 @@ def __run__(fu, params):
             test_labels, test_features = fu.extract(test_df, "test")
 
             model = pickle.load(open(params["model_dir"]+params["os_sep"]+"model_"+str(cohort+1)+".pickle", "rb"))
+            #fu.evaluate_model(model)
             models.append(model)
 
         fu.evaluate_models(models)
@@ -139,17 +147,13 @@ def __run__(fu, params):
         fu.print_evaluation(train_features.columns)
         print("< total predictions:", pred_count)
 
-        # marked (<-) added on 250414 to facilitate feature selection
         if params["permutation_importance"] == True:
             all_importances_std  = np.std(all_importances_mean, axis=1)
             all_importances_mean = np.average(all_importances_mean, axis=1)
 
             for i in all_importances_mean.argsort()[::-1]:
-                #if all_importances_mean[i] - 2 * all_importances_std[i] > 0:
                 print(f"{model.feature_names_in_[i]:<8}", f"{all_importances_mean[i]:.3f}", f" +/- {all_importances_std[i]:.3f}")
         
-        # <- ends here
-
 
     # perform simple prediction
     if params["mode"] == "predict" or params["mode"] == "predict_and_evaluate":
@@ -221,7 +225,7 @@ def __run__(fu, params):
         for i in range(params["cohorts"]):
             index.append((np.array(df[df["ID:cohort"] != i+1].index), np.array(df[df["ID:cohort"] == i+1].index)))
 
-        param_grid = {'max_features': ['sqrt', 'log2', None],#"max_features": [3, 20],
+        param_grid = {'max_features': ['sqrt', 'log2', None],
                       "max_samples": [500, 2000],
                       "min_samples_leaf": [2, 250],
                       "min_samples_split": [2, 250]}
@@ -246,29 +250,30 @@ def main():
             # median expression: median of median expressions of full dataset (tcga_expression_info) after filtering for median_fpkm_unstranded >= 1
             # lindeboom prediction: mean of all lindeboom predictions (full genome build 38), converted mean: 0.6859838726827834, unconverted mean: 0.4419001872943089
             "default_values":      {"FEATURE:mean expression": 4.819906570601459, "FEATURE:median expression": 4.68850178030303, "FEATURE:lindeboom prediction": 0.6859838726827834}, # <-
-            "expressions_fname":   "tcga_avg_expressions.txt", # <- added on 250427 to integrate novel model features
-            "fname":               "model_training_variants.txt",
+            "expressions_fname":   "tcga_expressions_info.txt", # <- added on 250427 to integrate novel model features
+            "fname":               "teran_read_through_reduced_avg_changed.txt",
             "genome_index":        [0, 10000],
             "hg_build":            "hg38",
             "label_id":            "LABEL:NMD score",
             "label_input":         "ASE", # "ASE", "nonASE" expected input for Lindeboom predictions is nonASE
-            "label_output":        "ASE", # "ASE", "nonASE", "nonASE2" # "nonASE2" added on 250410
-            "labels_to_class":     False,
+            "label_output":        "ASE", # "ASE", "nonASE", "nonASE2" # "nonASE2" added on 250410 (see Kim et al.)
+            "labels_to_class":     True,
             "lindeboom_output":    "ASE", # "ASE", "nonASE", None
             "mode":                "fit", # "create_genome_predictions", "evaluate_fit", "fit", "predict", "predict_and_evaluate", "predict_by_cohorts" "tuning" # 'tuning' added on 250414
             "model_dir":            parent_dir+r"\data\nmdelphi",
             "opt_metric":          "auroc",
             "os_sep":              "\\",
             "permutation_importance": True, # newly added on 250414
-            "print_model":         True, # newly added on 250410
+            "print_model":         False, # newly added on 250410
             "randomize_balancing": True,
             "remove_gaps":         False, # newly added on 250414
+            "selected_features":   [],
             "session_dir":         None,
             "tag":                 "nmdelphi",
             "target_dir":          parent_dir+r"\data",
             "test_fraction":       1,
             "threads":             1,
-            "tree_mode":           "fast", # "fast" "slow" "decision_tree" "fast_class" "slow_class"
+            "tree_mode":           "slow", # "fast" "slow" "decision_tree" "fast_class" "slow_class" "xgboost"
             "values":              {'FEATURE:dist. from last EJC': 627.5703261140154, 'FEATURE:lindeboom prediction': 0.8081107710910813, 'FEATURE:mean expression': 16.03474136632121, 'FEATURE:median expression': 14.210174319898858}, # values for kim_reduced_avg
             "verbosity":           1
             }

@@ -10,48 +10,49 @@ def _run(sau):
         cox_regression_results = sau.run_cox_regression()
         if sau.params["show_plot"] == True: sau.create_forest_plot(cox_regression_results)
         cox_regression_results.to_csv(sau.newdir+sau.params["os_sep"]+sau.params["fname"].split(".")[0]+"_cox_regression.txt")
+        return cox_regression_results
 
     # marked (<-) added on 250521, modified on 250825
     if sau.params["mode"] == "kaplan_meier_estimator" or sau.params["mode"] == "kaplan_meier_max_stats":
         sau.load()
         km_results = sau.kaplan_meier_estimator()
         km_results.to_csv(sau.newdir+sau.params["os_sep"]+sau.params["fname"].split(".")[0]+"_kaplan_meier.txt", index=False)
-
-    # return cox_regression_results # <- removed on 250826
+        return km_results
 
 
 def main():
     # parameters
     params = {
-              "cox_filter"          : {"class": "ID:CANCER_TYPE"}, #"value": {"FEATURE:ptc_mutations": [1, 2, 5, 10, 20]}},
+              "cox_filter"          : {"class": "ID:cancer type"},
               "cox_log"             : True,
-              "cox_mode"            : "multivariate", # "univariate" "multivariate"
+              "cox_mode"            : "univariate", # "univariate" "multivariate"
               "data_dir"            : parent_dir+r"data\2025-06-23_16-06-47_TCGA_NMD_targets_analysis_FPKM_exp_ccorr\ptc50_projectwise", # put here the folder of target analysis (result from evaluate_cancer_scores)
-              "fname"               : "selection_stats.txt",
+              "fname"               : "tcga_zeros_included_filtered.txt",
               # key specifies splitting feature, value specifies splits (minimum value is 2, for >= 2 only extreme splits are considered (e.g. 0 and 2 for 3 splits))
-              "km_filter"           : {"FEATURE:prediction": 2}, # <- added on 250521 
+              # <- added on 250521, if number, quantile-based stratification is conducted (see above line), if list, threshold based stratification is conducted
+              "km_filter"           : {"FEATURE:prediction": 2}, 
               "km_percentiles"      : [i for i in range(10, 90, 1)], # <- added on 250825 
               "label_ids"           : ["LABEL:OS", "LABEL:OS.time"],
-              "max_stat_steps"      : 2, # <- added on 250825 
+              "max_stat_steps"      : 1000, # <- added on 250825 
               "mode"                : "kaplan_meier_max_stats", # "cox_regression" "kaplan_meier_estimator" "kaplan_meier_max_stats"
               "os_sep"              : "\\",
               "placeholder_exceptions": ["FEATURE:fpkm_unstranded", "FEATURE:MSI_SCORE"], # defines categories to be excluded from placeholder analysis because negative values can exist
               "projectwise"         : False,
               # marked with <- edited on 250408 (added) to conduct survival analysis with selected features only
-              "selected_features"   : ["FEATURE:ptc_mutations", "FEATURE:prediction"], # 'FEATURE:expression', 'FEATURE:ptc_mutations2', 'FEATURE:escape', 'FEATURE:target', 'FEATURE:prediction', 'FEATURE:fpkm_unstranded' 'FEATURE:expression', 'FEATURE:ptc_mutations2', 'FEATURE:exon', 'FEATURE:age_at_initial_pathologic_diagnosis', 'FEATURE:fpkm_unstranded', 'FEATURE:cnv total'], # ["FEATURE:expression", "FEATURE:target", "FEATURE:cnv total", "FEATURE:fpkm_unstranded", "FEATURE:ptc_mutations2"], # [] to switch off <-
+              "selected_features"   : ["FEATURE:prediction"], # 'FEATURE:expression', 'FEATURE:ptc_mutations2', 'FEATURE:escape', 'FEATURE:target', 'FEATURE:prediction', 'FEATURE:fpkm_unstranded' 'FEATURE:expression', 'FEATURE:ptc_mutations2', 'FEATURE:exon', 'FEATURE:age_at_initial_pathologic_diagnosis', 'FEATURE:fpkm_unstranded', 'FEATURE:cnv total'], # ["FEATURE:expression", "FEATURE:target", "FEATURE:cnv total", "FEATURE:fpkm_unstranded", "FEATURE:ptc_mutations2"], # [] to switch off <-
               "separator"           : ",",
               "show_plot"           : False, # <- added on 250523
-              "tag"                 : "msk",
+              "tag"                 : "msk_immuno_after_sequencing",
               "target_dir"          : parent_dir+r"\data",
-              "type"                : "msk_chord", # "mskcc" "msk_chord" "tcga" "tcga_cancer_scores"
+              "type"                : "mskcc", # "mskcc" "tcga" "tcga_cancer_scores"
              }
 
     
     # default values for tcga
-    if params["type"] == "msk_chord":
-        params["data_dir"]  = parent_dir+r"\data"
-        params["fname"]     = "msk_chord_survival_analysis.txt"
-        params["label_ids"] = ["LABEL:OS_STATUS", "LABEL:OS_MONTHS"]
+    if params["type"] == "mskcc":
+        params["cox_filter"] = {"class": "ID:CANCER_TYPE"}
+        params["fname"]      = "msk_chord_survival_analysis.txt"
+        params["label_ids"]  = ["LABEL:OS_STATUS", "LABEL:OS_MONTHS"]
 
 
     if params["projectwise"] == False:
@@ -77,28 +78,25 @@ def main():
         fnames = os.listdir(params["data_dir"])
 
         if params["type"] == "tcga_cancer_scores":
-            fnames = [fname for fname in fnames if "extracted_cancer_scores" in fname]
+            fnames = [fname for fname in fnames if "extracted_cancer_scores" in fname and "kaplan" not in fname]
 
-            full_cox_regression_results = [] # <- added on 250605
+            full_results = []
             for fname in fnames:
                 params["fname"] = fname
                 params["tag"]   = fname.split(".")[0].split("_")[-1]
 
                 sau = Survival_analysis_utils(params, newdir=params["data_dir"])
-                try:
-                    cox_regression_results       = _run(sau)
-                    cox_regression_results.index = [params["tag"]+"_"+cox_regression_results.index[i] for i in range(cox_regression_results.shape[0])] # <- added on 250605
-                    full_cox_regression_results.append(cox_regression_results) # <- added on 250605
+                results       = _run(sau)
+                results.index = [params["tag"]+"_"+str(results.index[i]) for i in range(results.shape[0])]
+                full_results.append(results)
+                print("<", fname, "is skipped.")
 
-                except:
-                    print("<", fname, "is skipped.")
-
-            full_cox_regression_results = pd.concat(full_cox_regression_results).sort_index() # <- added on 250605
-            sau.params["tag"]      = sau.params["data_dir"].split(sau.params["os_sep"])[-1] # <- added on 250605
-            sau.create_newdir() # <- added on 250605
+            full_results = pd.concat(full_results).sort_index()
+            sau.params["tag"] = sau.params["data_dir"].split(sau.params["os_sep"])[-1]
+            sau.create_newdir()
             pd.set_option('display.max_rows', None)
-            print(full_cox_regression_results[[True if "FEATURE:ptc_mutations2" in i else False for i in full_cox_regression_results.index]])
-            full_cox_regression_results.to_csv(sau.newdir+sau.params["os_sep"]+sau.params["tag"]+"_cox_regression.txt", sep=",") # <- added on 250605
+            print(full_results[[True if "FEATURE:ptc_mutations2" in i else False for i in full_results.index]])
+            full_results.to_csv(sau.newdir+sau.params["os_sep"]+sau.params["tag"]+"_full_results.txt", sep=",")
 
 if __name__ == '__main__':
     main()

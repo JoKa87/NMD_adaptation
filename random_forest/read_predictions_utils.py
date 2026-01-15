@@ -6,7 +6,7 @@ from analyze_predictions_utils import *
 
 class Read_predictions_utils(Analyze_predictions_utils):
     def __init__(self, params):
-        super().__init__(params, {}) # <- added on 250807
+        super().__init__(params, {})
 
         self.params                       = params
         self.params["appris_selection"]   = False
@@ -16,8 +16,7 @@ class Read_predictions_utils(Analyze_predictions_utils):
     def compare_scores(self, scores, targets, predictions):
         matches    = 0
         mismatches = 0
-        # marked (<-) added on 250520
-        report     = {} # <-
+        report     = {}
 
         for i in range(len(scores)):
             if pd.isna(scores[i]) == False and scores[i] != round(targets.iloc[i].loc[self.params["target"]["prediction_identifier"]], 4):
@@ -25,8 +24,7 @@ class Read_predictions_utils(Analyze_predictions_utils):
                 transcript  = targets.iloc[i].loc[self.params["target"]["transcript_identifier"]]
                 print("< score mismatch @", transcript, scores[i], "/", targets.iloc[i].loc[self.params["target"]["prediction_identifier"]])
 
-                # marked (<-) added on 250520
-                report[transcript] = targets.iloc[i].loc[self.params["target"]["position_identifier"]] # <-
+                report[transcript] = targets.iloc[i].loc[self.params["target"]["position_identifier"]]
 
                 selected_predictions = predictions[predictions[self.params["prediction_transcript_identifier"]] == transcript]
                 for j in range(selected_predictions.shape[0]):
@@ -40,6 +38,7 @@ class Read_predictions_utils(Analyze_predictions_utils):
             ". pearsonr", scipy.stats.pearsonr([score for score in scores if pd.isna(score) == False], [targets.iloc[i].loc[self.params["target"]["prediction_identifier"]] for i in range(targets.shape[0]) if scores[i] != None]))
 
         print(report)
+        print(len(report))
 
 
     def print_scores(self, scores, targets):

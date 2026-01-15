@@ -49,7 +49,7 @@ def extract_sequence(transcript, genome):
 
 # parameters (default setting: input from Teran et al. 2021 (mmc4.txt))
 params = {
-         "data_dir":          parent_dir+r"\data",
+         "data_dir":          r"C:\Programming\Translational_genomics\NMD_analysis\data",
          "error_handling":    { # defines handling of errors during sequence information extraction (True means excluding errors)
                               "chromosome_not_found"            : True,
                               "no_start"                        : True,
@@ -71,11 +71,11 @@ def main():
 
         if hg_build == "hg19":
             hg_build_dir    = "hg19"
-            knowngene_fname = "hg19_knownGene.txt"
+            knowngene_fname = "hg19_knownGene_appended.txt"
 
         if hg_build == "hg38":
             hg_build_dir    = "hg38.p14"
-            knowngene_fname = "hg38_knownGene.txt"
+            knowngene_fname = "hg38_knownGene_appended.txt"
 
 
         # load genome

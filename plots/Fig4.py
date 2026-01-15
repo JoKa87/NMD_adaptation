@@ -48,15 +48,15 @@ def main():
                                "xrange":         (-0.25, 33.4),
                                "xlabels":        [],
                                "ylabel":         "NMD adaptation",
-                               "yrange":         (-0.02, 0.15)
+                               "yrange":         (-0.22, 0.17)
                                },
             "off"           : False,
-            "paths"         : [[parent_dir+r"\data\prediction_analysis_tcga\2025-07-10_13-28-51_tcga_projectwise\2025-07-11_09-29-57_binomial"],
-                               [parent_dir+r"\data\prediction_analysis_tcga\2025-07-10_11-04-37_tcga\2025-07-11_08-31-27_binomial\selection_stats.txt"],
-                               [parent_dir+r"\data\prediction_analysis_tcga\2025-07-10_13-29-31_tcga_nonsense_projectwise\2025-07-11_09-30-24_binomial"],
-                               [parent_dir+r"\data\prediction_analysis_tcga\2025-07-10_11-05-12_tcga_nonsense\2025-07-11_08-32-05_binomial\selection_stats.txt"],
-                               [parent_dir+r"\data\prediction_analysis_tcga\2025-07-10_14-02-07_tcga_frameshift_projectwise\2025-07-11_09-31-07_binomial"],
-                               [parent_dir+r"\data\prediction_analysis_tcga\2025-07-10_11-25-34_tcga_frameshift\2025-07-11_08-32-39_binomial\selection_stats.txt"]],
+            "paths"         : [[parent_dir+r"\data\prediction_analysis_tcga\2025-07-10_13-28-51_tcga_projectwise\2025-10-27_14-59-54_binomial"],
+                               [parent_dir+r"\data\prediction_analysis_tcga\2025-07-10_11-04-37_tcga\2025-10-21_17-38-31_binomial\selection_stats.txt"],
+                               [parent_dir+r"\data\prediction_analysis_tcga\2025-07-10_13-29-31_tcga_nonsense_projectwise\2025-10-27_15-04-49_binomial"],
+                               [parent_dir+r"\data\prediction_analysis_tcga\2025-07-10_11-05-12_tcga_nonsense\2025-10-27_15-16-01_binomial\selection_stats.txt"],
+                               [parent_dir+r"\data\prediction_analysis_tcga\2025-07-10_14-02-07_tcga_frameshift_projectwise\2025-10-27_15-13-58_binomial"],
+                               [parent_dir+r"\data\prediction_analysis_tcga\2025-07-10_11-25-34_tcga_frameshift\2025-10-27_15-16-47_binomial\selection_stats.txt"]],
             "separators"    : [",", ",", ",", ",", ",", ","],
             "type"          : "barplot2"
             },
@@ -69,12 +69,11 @@ def main():
                               "cmap"        : "Blues",
                               "tag"         : "escape",
                               "xcol"        : [[None]],
-                              "xmute"       : True,
                               "ymute"       : True,
                               "ycol"        : "block id"
                                },
             "off"           : False,
-            "paths"         : [[parent_dir+r"\data\prediction_analysis_tcga\2025-07-10_11-04-37_tcga\2025-07-11_08-31-27_binomial\selection_stats.txt"]],
+            "paths"         : [[parent_dir+r"\data\prediction_analysis_tcga\2025-07-10_11-04-37_tcga\2025-10-21_17-38-31_binomial\selection_stats.txt"]],
             "separators"    : [","],
             "type"          : "matrix"
             },
@@ -91,8 +90,8 @@ def main():
                               "ycol"        : "block id"
                                },
             "off"           : False,
-            "paths"         : [[parent_dir+r"\data\prediction_analysis_tcga\2025-07-10_11-04-37_tcga\2025-07-11_08-31-27_binomial\selection_stats.txt"],
-                               [parent_dir+r"\data\TCGA.PanCancer.onco.genes.OncoVar.tsv"]],
+            "paths"         : [[parent_dir+r"\data\prediction_analysis_tcga\2025-07-10_11-04-37_tcga\2025-10-21_17-38-31_binomial\selection_stats.txt"],
+                               [r"C:\Programming\Translational_genomics\NMD_analysis\data\TCGA.PanCancer.onco.genes.OncoVar.tsv"]],
             "separators"    : [",", "\t"],
             "target_cols"   : ["OncoKB", "2020Rule", "CTAT"],
             "type"          : "matrix2"
@@ -110,7 +109,7 @@ def main():
                               "ymute"       : True
                                },
             "off"           : False,
-            "paths"         : [[parent_dir+r"\data\prediction_analysis_tcga\2025-07-10_11-04-37_tcga\2025-07-11_08-31-27_binomial\selection_stats.txt"]],
+            "paths"         : [[parent_dir+r"\data\prediction_analysis_tcga\2025-07-10_11-04-37_tcga\2025-10-21_17-38-31_binomial\selection_stats.txt"]],
             "separators"    : [","],
             "type"          : "matrix"
             },
@@ -128,8 +127,8 @@ def main():
                               "ycol"        : "block id"
                                },
             "off"           : False,
-            "paths"         : [[parent_dir+r"\data\prediction_analysis_tcga\2025-07-10_11-04-37_tcga\2025-07-11_08-31-27_binomial\selection_stats.txt"],
-                               [parent_dir+r"\data\TCGA.PanCancer.onco.genes.OncoVar.tsv"]],
+            "paths"         : [[parent_dir+r"\data\prediction_analysis_tcga\2025-07-10_11-04-37_tcga\2025-10-21_17-38-31_binomial\selection_stats.txt"],
+                               [r"C:\Programming\Translational_genomics\NMD_analysis\data\TCGA.PanCancer.onco.genes.OncoVar.tsv"]],
             "separators"    : [",", "\t"],
             "target_cols"   : ["OncoKB", "2020Rule", "CTAT"],
             "type"          : "matrix2"
@@ -227,6 +226,7 @@ def main():
 
     # define figure
     fig = plt.figure(figsize=(180/25.4, 180/25.4), constrained_layout=True)
+
     gs = fig.add_gridspec(dims[0], 3*dims[1]+1, wspace=2)
 
     subplots = []
@@ -267,17 +267,16 @@ def main():
             data[i]["features"]["xcol"]    = data[i]["features"]["labels"]
             data[i]["features"]["xlabels"] = ptc_mutations["project"].tolist()
 
-            # marked (<-) added / removed on 250523
-            # subplots[i] = pu.bar_plot(subplots[i], [ptc_mutations[[data[i]["features"]["labels"][0][0], data[i]["features"]["labels"][0][1]]]], data[i]["features"]) # <- removed
-            if len(data[i]["features"]["labels"][0]) == 1: # <- added
-                subplots[i] = pu.bar_plot(subplots[i], [ptc_mutations[[data[i]["features"]["labels"][0][0]]]], data[i]["features"]) # <- added
+            if len(data[i]["features"]["labels"][0]) == 1:
+                subplots[i] = pu.bar_plot(subplots[i], [ptc_mutations[[data[i]["features"]["labels"][0][0]]]], data[i]["features"])
 
-            elif len(data[i]["features"]["labels"][0]) == 2: # <- added
-                subplots[i] = pu.bar_plot(subplots[i], [ptc_mutations[[data[i]["features"]["labels"][0][0], data[i]["features"]["labels"][0][1]]]], data[i]["features"]) # <- added
+            elif len(data[i]["features"]["labels"][0]) == 2:
+                subplots[i] = pu.bar_plot(subplots[i], [ptc_mutations[[data[i]["features"]["labels"][0][0],
+                                                                       data[i]["features"]["labels"][0][1]]]], data[i]["features"])
 
-            else: # <- added
-                print("< unexpected label size") # <- added
-                exit() # <- added
+            else:
+                print("< unexpected label size")
+                exit()
 
 
         if data[i]["type"] == "barplot2" or data[i]["type"] == "barplot3":
@@ -321,6 +320,7 @@ def main():
 
             if data[i]["type"] == "barplot2": subplots[i] = pu.bar_plot(subplots[i], [temp_data[data[i]["features"]["xcol"][0]]], data[i]["features"])
             if data[i]["type"] == "barplot3": subplots[i] = pu.bar_plot(subplots[i], [temp_data[["escape", "target"]]], data[i]["features"])
+            subplots[i].set_yticks([-0.2, -0.1, 0, 0.1])
 
 
         if data[i]["type"] == "coordinates":
@@ -334,16 +334,12 @@ def main():
         if data[i]["type"] == "matrix" or data[i]["type"] == "matrix2":
             # aggregated value contains 
             if data[i]["features"]["tag"] == "escape":
-                #selected_data = data[i]["data"][0][[True if data[i]["data"][0].iloc[j].loc["escape"] > data[i]["data"][0].iloc[j].loc["target"] else False
-                #                                    for j in range(data[i]["data"][0].shape[0])]]
                 selected_data = data[i]["data"][0][[True if data[i]["data"][0].iloc[j].loc["binomial-statistic FEATURE:prediction"] > 0 else False
                                                     for j in range(data[i]["data"][0].shape[0])]]
                 selected_data = selected_data[selected_data["block id"] != "total"]
                 selected_data = selected_data.sort_values(by=data[i]["features"]["tag"], ascending=False).iloc[0:15]
             
             if data[i]["features"]["tag"] == "target":
-                #selected_data = data[i]["data"][0][[True if data[i]["data"][0].iloc[j].loc["escape"] < data[i]["data"][0].iloc[j].loc["target"] else False
-                #                                    for j in range(data[i]["data"][0].shape[0])]]
                 selected_data = data[i]["data"][0][[True if data[i]["data"][0].iloc[j].loc["binomial-statistic FEATURE:prediction"] < 0 else False
                                                     for j in range(data[i]["data"][0].shape[0])]]
                 selected_data = selected_data[selected_data["block id"] != "total"]

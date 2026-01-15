@@ -33,8 +33,6 @@ def _find_missing_values(df, feature):
     # check for outdated placeholders
     if df[df[feature] == -1].shape[0] > 0:
         print("< potential outdated placeholder '-1' detected @", feature, "("+str(df[df[feature] == -1].shape[0])+")")
-        # marked (<-) removed on 250414 because causing error with expected -1 value
-        # exit() # <-
     
     if df[df[feature] == "-"].shape[0] > 0:
         print("< potential outdated placeholder '-' detected @", feature, "("+str(df[df[feature] == "-"].shape[0])+")")
@@ -55,10 +53,8 @@ class Forest_utils:
         self.test_metrics       = test_metrics
         self.test_preds         = []
         self.train_metrics      = train_metrics
-        
-        # marked (<-) added on 250411 to allow printing of gap values
-        self.cohort_values      = {} # <-
-        self.values             = {} # <-
+        self.cohort_values      = {}
+        self.values             = {}
 
         os_name = platform.system()
         self.os_sep = "//"
@@ -83,20 +79,13 @@ class Forest_utils:
                 
                 df = df[df["LABEL:NMD score"] != -1000]
 
-            # marked (<-) was added on 2050410 to allow transformation according to Kim et al. (r = -ln2(VAF(RNA) / VAF(DNA)))
-            # only True for normal data (with VAF(DNA) = 0.5)
             if self.params["label_output"] == "nonASE2":
                 df["LABEL:NMD score"] = [-math.log2((1-df.iloc[i].loc["LABEL:NMD score"])/0.5) if df.iloc[i].loc["LABEL:NMD score"] > 0 
                                          else None for i in range(df.shape[0])]
                 df = df[~df["LABEL:NMD score"].isna()]
-            # <- ends here 
         
         # transformation of predictions by Lindeboom et al. 2019 (r = (A+B) / 2A)
         if self.params["lindeboom_output"] == "ASE":
-            # marked (<-) edited on 250409 to avoid string conversion that was due to old placeholder usage ("-" instead of None)
-            #df["FEATURE:lindeboom prediction"] = [str(1/(2*math.exp(-math.log(2)*float(df.iloc[i].loc["FEATURE:lindeboom prediction"])))) <- removed
-            #                                      if pd.isna(df.iloc[i].loc["FEATURE:lindeboom prediction"]) == False else None for i in range(df.shape[0])] <- removed
-
             df["FEATURE:lindeboom prediction"] = [1/(2*math.exp(-math.log(2)*float(df.iloc[i].loc["FEATURE:lindeboom prediction"]))) # <- added
                                                   if pd.isna(df.iloc[i].loc["FEATURE:lindeboom prediction"]) == False else None for i in range(df.shape[0])] # <- added
 
@@ -251,14 +240,12 @@ class Forest_utils:
             if self.params["fname"] == path:
                 with open(self.params["data_dir"]+self.os_sep+path, 'r') as _:
                     df = pd.read_csv(self.params["data_dir"]+self.os_sep+path, delimiter=",", index_col=False)
-                    # marked (<-) added / removed on 250510
-                    # df = df.dropna(subset=self.params["label_id"]) # <- removed
-                    if self.params["mode"] != "predict": df = df.dropna(subset=self.params["label_id"]) # <- added
+                    if self.params["mode"] != "predict": df = df.dropna(subset=self.params["label_id"])
 
                     # marked (<-) added on 250415 to remove gaps from features
-                    if self.params["remove_gaps"] == True: # <-
-                        df = df.dropna(subset=[col for col in df.columns if "FEATURE" in col and col != "FEATURE:rna half-life"]) # <-
-                        df = df.reset_index() # <-
+                    if self.params["remove_gaps"] == True:
+                        df = df.dropna(subset=[col for col in df.columns if "FEATURE" in col and col != "FEATURE:rna half-life"])
+                        df = df.reset_index()
                 
                 # check if label is present
                 if self.params["label_id"] not in df.columns:
@@ -273,6 +260,15 @@ class Forest_utils:
                 self.init_df = df
 
                 if self.params["decision_threshold"] == None: self.params["decision_threshold"] = df[self.params["label_id"]].median()
+
+                if len(self.params["selected_features"]) > 0:
+                    try:
+                        df = df[[*[col for col in df.columns if "ID" in col or "LABEL" in col], *self.params["selected_features"]]]
+
+                    except:
+                        print("< selected features could not be found")
+                        print(df.columns.tolist())
+                        exit()
                     
                 # initial modifications: replacement of missing values (with the exception of the skip feature)
                 for feature in df.columns:
@@ -280,21 +276,16 @@ class Forest_utils:
                         missing_index = _find_missing_values(df, feature)
 
                         if len(missing_index) > 0:
-                            # marked (<-) added/removed on 250414 to allow hyper-parameter und and model selection
-                            #if self.params["mode"] == "fit": # <- removed
-                            if self.params["mode"] == "fit" or self.params["mode"] == "tuning": # <- added
+                            if self.params["mode"] == "fit" or self.params["mode"] == "tuning":
                                 if self.params["cohortwise_misses"] == False:
-                                    # marked (<-) added/removed on 250428 to allow usage of default values (specified in params)
-                                    # mean = df[~df[feature].isna()][feature].mean() # <- removed
-                                    if feature in self.params["default_values"]: mean = self.params["default_values"][feature] # <- added
-                                    else:                                        mean = df[~df[feature].isna()][feature].mean() # <- added
+                                    if feature in self.params["default_values"]: mean = self.params["default_values"][feature]
+                                    else:                                        mean = df[~df[feature].isna()][feature].mean()
                                     
                                     for missing_index_ in missing_index:
                                         df.at[df.index[missing_index_], feature] = mean
 
                                     print("< missing values for feature", feature, "replaced by", mean)
-                                    # marked (<-) added on 250411 to allow printing of updated values
-                                    self.values[feature] = mean # <-
+                                    self.values[feature] = mean
 
 
                                 if self.params["cohortwise_misses"] == True:
@@ -303,9 +294,7 @@ class Forest_utils:
                                     for cohort in range(self.params["cohorts"]):
                                         cohort_df       = df[df["ID:cohort"] == cohort+1]
                                         non_cohort_df   = df[df["ID:cohort"] != cohort+1]
-                                        # marked (<-) added/removed on 250428 to allow usage of default values (specified in params)
-                                        # mean            = non_cohort_df[~non_cohort_df[feature].isna()][feature].mean() # <-
-                                        if feature in self.params["default_values"]: mean = self.params["default_values"][feature] # <- added
+                                        if feature in self.params["default_values"]: mean = self.params["default_values"][feature]
                                         else:                                        mean = non_cohort_df[~non_cohort_df[feature].isna()][feature].mean() # <- added
 
                                         for missing_index_ in missing_index:
@@ -314,9 +303,8 @@ class Forest_utils:
                                                 testsize                                += 1
                                         
                                         print("< missing values for feature", feature, "replaced by", mean, "in cohort", cohort)
-                                        # marked (<-) added on 250411 to allow printing of updated values
-                                        if feature in self.cohort_values: self.cohort_values[feature][cohort] = mean # <-
-                                        else:                             self.cohort_values[feature] = {cohort: mean} # <-
+                                        if feature in self.cohort_values: self.cohort_values[feature][cohort] = mean
+                                        else:                             self.cohort_values[feature] = {cohort: mean}
 
                                     if testsize != len(missing_index):
                                         print("< error occurred during replacement of missing values ("+str(testsize)+"/"+str(len(missing_index))+")")
@@ -326,8 +314,6 @@ class Forest_utils:
                             else:
                                 if self.params["cohortwise_misses"] == False:
                                     for missing_index_ in missing_index:
-                                        # marked (<-) added/removed on 250428 to allow usage of default values (specified in params)
-                                        # df.at[df.index[missing_index_], feature] = self.params["values"][feature] # <- removed
                                         if feature in self.params["default_values"]: df.at[df.index[missing_index_], feature] = self.params["default_values"][feature] # <- added
                                         else:                                        df.at[df.index[missing_index_], feature] = self.params["values"][feature] # <- added
 
@@ -340,8 +326,6 @@ class Forest_utils:
 
                                         for missing_index_ in missing_index:
                                             if missing_index_ in cohort_df.index:
-                                                # marked (<-) added/removed on 250428 to allow usage of default values (specified in params)
-                                                # df.at[df.index[missing_index_], feature] = self.params["cohort_values"][feature][cohort] # <- removed
                                                 if feature in self.params["default_values"]: df.at[df.index[missing_index_], feature] = self.params["default_values"][feature] # <- added
                                                 else:                                        df.at[df.index[missing_index_], feature] = self.params["cohort_values"][feature][cohort] # <- added
                                                 testsize += 1
@@ -382,8 +366,8 @@ class Forest_utils:
             if key != "r2": file.write(key + ": " + str(testing_stats[key][0]) + "+/-" + str(testing_stats[key][1]) + "\n")
 
         # marked (<-) added on 250411 to allow printing of updated values
-        if len(self.cohort_values) > 0: self.params["cohort_values"] = self.cohort_values # <-
-        if len(self.values) > 0:        self.params["values"]        = self.values # <-
+        if len(self.cohort_values) > 0: self.params["cohort_values"] = self.cohort_values
+        if len(self.values) > 0:        self.params["values"]        = self.values
 
         file.write("\n")
         file.write("hyperparameters:" + "\n")
@@ -410,14 +394,10 @@ class Forest_utils:
     def print_preds(self, df, all_preds, all_index):
         if len(all_preds.shape) > 1: all_preds = np.average(all_preds, axis=1)
 
-        # marked (<-) added / removed on 250630
-        # df["FEATURE:prediction"] = [all_preds[i] for i in all_index] # <- removed
-        # df                       = df.iloc[all_index] # <- removed
-
-        df["FEATURE:prediction"] = [None for _ in all_index] # <- removed
+        df["FEATURE:prediction"] = [None for _ in all_index]
         
-        for i, i_ in enumerate(all_index): # <- added
-            df.at[i_, "FEATURE:prediction"] = float(all_preds[i]) # <- added
+        for i, i_ in enumerate(all_index):
+            df.at[i_, "FEATURE:prediction"] = float(all_preds[i])
 
         df = df[[col for col in df.columns if "ID" in col or "prediction" in col or "LABEL" in col]]
         if self.params["balance"] == False: df.to_csv(path_or_buf=self.newdir+self.params["os_sep"]+"all_preds.txt", sep=",", index=False)
@@ -450,24 +430,21 @@ class Forest_utils:
         test_df  = df[df["ID:cohort"] == cohort]
         train_df = df[df["ID:cohort"] != cohort]
 
-        # marked (<-) added/removed on 250426 to account for missing gene ids in data from Kim et al.
         # check that identical gene ids are not present in both train_df and test_df
         if "ID:gene id" in test_df.columns:
-            selected = train_df[train_df["ID:gene id"].isin(test_df["ID:gene id"])] # <- added
+            selected = train_df[train_df["ID:gene id"].isin(test_df["ID:gene id"])]
             
-            # if train_df[train_df["ID:gene id"].isin(test_df["ID:gene id"])].shape[0] > 0: # <- removed
-            if selected.shape[0] > 0 and selected[~selected["ID:gene id"].isna()].shape[0] > 0: # <- added
+            if selected.shape[0] > 0 and selected[~selected["ID:gene id"].isna()].shape[0] > 0:
                 print("< error. ambiguous gene ids detected.")
-                # print(train_df[train_df["ID:gene id"].isin(test_df["ID:gene id"])]["ID:gene id"].tolist()) # <- removed
-                print(selected["ID:gene id"].tolist()) # <- added
+                print(selected["ID:gene id"].tolist())
                 exit()
 
-        if "ID:gene symbol" in test_df.columns: # <- added
-            selected = train_df[train_df["ID:gene symbol"].isin(test_df["ID:gene symbol"])] # <- added
+        if "ID:gene symbol" in test_df.columns:
+            selected = train_df[train_df["ID:gene symbol"].isin(test_df["ID:gene symbol"])]
             
-            if selected.shape[0] > 0 and selected[~selected["ID:gene symbol"].isna()].shape[0] > 0: # <- added
-                print("< error. ambiguous gene ids detected.") # <- added
-                print(selected["ID:gene symbol"].tolist()) # <- added
-                exit() # <- added
+            if selected.shape[0] > 0 and selected[~selected["ID:gene symbol"].isna()].shape[0] > 0:
+                print("< error. ambiguous gene ids detected.")
+                print(selected["ID:gene symbol"].tolist())
+                exit()
         
         return train_df, test_df

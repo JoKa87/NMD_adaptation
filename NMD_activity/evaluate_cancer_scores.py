@@ -1,3 +1,5 @@
+import os
+
 from evaluate_cancer_scores_utils import *
 from tcga_tools_utils import *
 
@@ -11,33 +13,33 @@ params = {
          "categorization"               : {"FEATURE:frameshift_mutations_FEATURE:ptc_mutations": {"intercept": 0, "slope": 5},
                                            "FEATURE:ptc_mutations_FEATURE:frameshift_mutations": {"intercept": 0, "slope": 0.33}},
          "class_cutoff"                 : 4,
-         "class_filter"                 : {"class 1": {"FEATURE:ptc_mutations": (1000000, 50), "total_nmd": (1000000, 0)},
-                                           "class 2": {"FEATURE:ptc_mutations": (1000000, 50), "total_nmd": (1000000, 0)}},
-         "class_selector"               : ("FEATURE:ptc_mutations", "FEATURE:frameshift_mutations"),
+         "class_filter"                 : {"class 1": {"FEATURE:ptc_mutations": (1000000, 0), "total_nmd": (1000000, 0)},
+                                           "class 2": {"FEATURE:ptc_mutations": (1000000, 0), "total_nmd": (1000000, 0)}},
+         "class_selector"               : None, # ("FEATURE:ptc_mutations", "FEATURE:frameshift_mutations"), None
          "class_test_inclusive"         : False, # True if class 2 is not-exclusive (contains class 1)
          "clinical_data_path"           : parent_dir+r"\data\tcga_survival_data.txt",
          "cohorts"                      : 5, # if None, no cohorts are created for extracted cancer scores, else n cohorts are created
-         "conduct_class_test"           : True,
+         "conduct_class_test"           : False,
          "contour_bins"                 : 5,
          "contour_scale"                : "equisize", # "equidistant" "equisize" "log"
+         "data_dir"                     : parent_dir+r"data\2025-08-11_23-06-51_TCGA_NMD_targets_analysis_FPKM_exp_ccorr", # insert directory here
          "data_type"                    : "raw",
-         "feature_filter"               : {"FEATURE:ptc_mutations": (1000000, 50), "total_nmd": (1000000, 0)},
+         "feature_filter"               : {"FEATURE:ptc_mutations": (1000000, 0), "total_nmd": (1000000, 0)},
          "features"                     : [
                                           "FEATURE:ptc_mutations2",
                                           "FEATURE:prediction",
                                           "fpkm_unstranded",
                                           "ID:cnv total",
                                           ],
-         "data_dir"                     : parent_dir+r"data\2025-08-11_23-06-51_TCGA_NMD_targets_analysis_FPKM_exp_ccorr", # insert directory here
-         "fname"                        : "cancer_scores_TCGA_NMD_targets_analysis_FPKM_exp_ccorr",
+         "fname"                        : "cancer_scores_TCGA_NMD_targets_analysis_FPKM_exp_ccorr_frameshift",
          "immune_data_path"             : parent_dir+r"\data\tcga_immune_scores.txt",
          "inversion_targets"            : ["fpkm_unstranded"],
          "os_sep"                       : "\\",
          "plot_mode"                    : "correlation", # "correlation" "distribution"
          "plot_type"                    : "correlation_plot", # "contour_plot" "correlation_plot"
-         "projectwise"                  : False,
+         "projectwise"                  : True,
          "ptc_target"                   : "ptc_mutations",
-         "selected_class"               : "class 2",
+         "selected_class"               : "class 1",
          "size_filter"                  : 0, # applied to mean/median values (cancer scores)
          "smoothing"                    : False,
          "smoothing_intervals"          : 30,
@@ -45,7 +47,7 @@ params = {
          "store_results"                : True,
          "store_selection"              : True,
          "sum_targets"                  : ["FEATURE:expression"],
-         "tag"                          : "class_selection_ptc50_class2",
+         "tag"                          : "ptc0",
          "use_inversion_targets"        : True,
          "use_sum_targets"              : False,
          "variant_path"                 : parent_dir+r"\data\tcga_variants.txt"

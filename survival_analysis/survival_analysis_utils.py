@@ -12,11 +12,13 @@ import platform
 import statsmodels.api as sm
 import sys
 
-sys.path.insert(0, r"C:\Programming\Translational_genomics\NMD_analysis\draft")
+parent_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
+
+sys.path.insert(0, parent_dir+"\\plots")
 from plot_utils import *
-sys.path.insert(0, r"C:\Programming\Translational_genomics\NMD_analysis\shared")
+sys.path.insert(0, parent_dir+"\\shared")
 from shared_utils import *
-sys.path.insert(0, r"C:\Programming\Translational_genomics\NMD_analysis\NMD_activity")
+sys.path.insert(0, parent_dir+"\\NMD_activity")
 from tcga_tools_utils import *
 
 
@@ -30,9 +32,7 @@ class Survival_analysis_utils(Plot_utils):
         if os_name == "Windows":
             self.os_sep = "\\"
 
-        # marked (<-) added / removed on 250605
-        #if newdir == None: self.newdir = self.create_newdir() # <- removed
-        if newdir == None: self.create_newdir() # <- added
+        if newdir == None: self.create_newdir()
         else:              self.newdir = newdir
 
         # print parameters to file
@@ -99,44 +99,16 @@ class Survival_analysis_utils(Plot_utils):
         if data.shape[0] == 0: data = self.data
         if data.shape[0] == 0: print("< empty dataframe @cox_regression")
 
-        # marked with <-) added / removed on 250408 to conduct survival analysis with selected features only
-        # features = [col for col in data.columns if "FEATURE" in col] # <- removed
-        features = [col for col in data.columns if "FEATURE" in col and (len(self.params["selected_features"]) == 0 or col in self.params["selected_features"])] # <- new
-        # marked with (<-) added / removed on 250605 to register sample sizes
-        # scores   = pd.DataFrame({col: [None for _ in features] for col in ["HR", "HR-lower 95%", "HR-upper 95%", "p-value", "concordance"]}, index=features) # <- removed
+        features = [col for col in data.columns if ("FEATURE" in col and len(self.params["selected_features"]) == 0) or col in self.params["selected_features"]] # <- new
         scores   = pd.DataFrame({col: [None for _ in features] for col in ["HR", "HR-lower 95%", "HR-upper 95%", "p-value", "p-adj", "concordance", "sample size"]}, index=features) # <- added / modified on 250823
         print("<", self.params["fname"])
 
-        # marked with <- added / removed on 250408 to conduct survival analysis with all features combined (see below)
-        '''
-        for feature in features:
-            selected_data = data[~data[feature].isna()]
-
-            if selected_data.shape[0] > 0 and selected_data[feature].min() != selected_data[feature].max():
-                cph = CoxPHFitter()
-                cph.fit(selected_data[[feature, *self.params["label_ids"]]], duration_col=self.params["label_ids"][1], event_col=self.params["label_ids"][0])
-                
-                if self.params["cox_log"] == False:
-                    scores.at[feature, "HR"]           = cph.summary.loc[feature].loc["exp(coef)"]
-                    scores.at[feature, "HR-lower 95%"] = cph.summary.loc[feature].loc["exp(coef) lower 95%"]
-                    scores.at[feature, "HR-upper 95%"] = cph.summary.loc[feature].loc["exp(coef) upper 95%"]
-
-                if self.params["cox_log"] == True:
-                    scores.at[feature, "HR"]           = cph.summary.loc[feature].loc["coef"]
-                    scores.at[feature, "HR-lower 95%"] = cph.summary.loc[feature].loc["coef lower 95%"]
-                    scores.at[feature, "HR-upper 95%"] = cph.summary.loc[feature].loc["coef upper 95%"]
-
-                scores.at[feature, "p-value"]     = cph.summary.loc[feature].loc["p"]
-                scores.at[feature, "concordance"] = cph.concordance_index_
-        ''' # <- removed
-
-        # added on 250408 from here <-
         # univariate analysis
         if self.params["cox_mode"] == "univariate":
             for feature in features:
                 selected_data = data[~data[feature].isna()]
 
-                if selected_data.shape[0] > 0 and selected_data[feature].min() != selected_data[feature].max():
+                if selected_data.shape[0] > 1 and selected_data[feature].min() != selected_data[feature].max():
                     cph = CoxPHFitter()
                     cph.fit(selected_data[[feature, *self.params["label_ids"]]], duration_col=self.params["label_ids"][1], event_col=self.params["label_ids"][0])
                     
@@ -152,17 +124,16 @@ class Survival_analysis_utils(Plot_utils):
 
                     scores.at[feature, "p-value"]     = cph.summary.loc[feature].loc["p"]
                     scores.at[feature, "concordance"] = cph.concordance_index_
-                    scores.at[feature, "sample size"] = selected_data.shape[0] # <- added on 250605
+                    scores.at[feature, "sample size"] = selected_data.shape[0]
 
-        #for feature in features:
-        #    print(feature, data[data[feature].isna()].shape[0])
         selected_data = data.dropna(subset=features)
     
         # multivariate analysis
         if self.params["cox_mode"] == "multivariate":
             cph = CoxPHFitter()
-            if selected_data.shape[0] > 0:
-                cph.fit(selected_data[[*features, *self.params["label_ids"]]], duration_col=self.params["label_ids"][1], event_col=self.params["label_ids"][0])
+            if selected_data.shape[0] > 1:
+                cph.fit(selected_data[[*features, *self.params["label_ids"]]], duration_col=self.params["label_ids"][1],
+                        event_col=self.params["label_ids"][0])
                 
                 for feature in features:
                     if self.params["cox_log"] == False:
@@ -177,9 +148,8 @@ class Survival_analysis_utils(Plot_utils):
 
                     scores.at[feature, "p-value"]     = cph.summary.loc[feature].loc["p"]
                     scores.at[feature, "concordance"] = cph.concordance_index_
-                    scores.at[feature, "sample size"] = selected_data.shape[0] # <- added on 250605
+                    scores.at[feature, "sample size"] = selected_data.shape[0]
         
-        # to here <-
         if verbose == True: print(scores.sort_index())
         return scores.sort_index()
 
@@ -193,7 +163,7 @@ class Survival_analysis_utils(Plot_utils):
 
     # <- function re-integrated in altered fashion on 250521
     def kaplan_meier_estimator(self):
-        km_results = {"class": [], "cutoff": [], "statistic": [], "pvalue": []} # <- added on 250825
+        km_results = {"class": [], "cutoff": [], "size 1": [], "size 2": [], "statistic": [], "pvalue": []} # <- added on 250825
 
         # if filters are defined, multiple runs are conducted to perform single output
         if "class" in self.params["cox_filter"]: classes = self.data.sort_values(by=self.params["cox_filter"]["class"]).drop_duplicates(subset=self.params["cox_filter"]["class"])[self.params["cox_filter"]["class"]].tolist()
@@ -211,28 +181,38 @@ class Survival_analysis_utils(Plot_utils):
                 fig, ax = plt.subplots(1)
 
                 if self.params["mode"] != "kaplan_meier_max_stats":
-                    index   = split_index(data.shape[0], list(self.params["km_filter"].values())[0])
-                    print(index)
-                    cutoffs = (data.iloc[index[0][1]].loc[list(self.params["km_filter"].keys())[0]], data.iloc[index[-1][0]].loc[list(self.params["km_filter"].keys())[0]])
+                    # <- added on 251101
+                    if type(self.params["km_filter"][list(self.params["km_filter"].keys())[0]]) != list:
+                        index   = split_index(data.shape[0], list(self.params["km_filter"].values())[0])
+                        cutoffs = (data.iloc[index[0][1]].loc[list(self.params["km_filter"].keys())[0]], data.iloc[index[-1][0]].loc[list(self.params["km_filter"].keys())[0]])
+                        times1  = data[data[list(self.params["km_filter"].keys())[0]] <= cutoffs[0]][self.params["label_ids"][1]]
+                        status1 = data[data[list(self.params["km_filter"].keys())[0]] <= cutoffs[0]][self.params["label_ids"][0]]
+                        times2  = data[data[list(self.params["km_filter"].keys())[0]] >= cutoffs[1]][self.params["label_ids"][1]]
+                        status2 = data[data[list(self.params["km_filter"].keys())[0]] >= cutoffs[1]][self.params["label_ids"][0]]
 
-                    times1  = data[data[list(self.params["km_filter"].keys())[0]] <= cutoffs[0]][self.params["label_ids"][1]]
-                    status1 = data[data[list(self.params["km_filter"].keys())[0]] <= cutoffs[0]][self.params["label_ids"][0]]
-                    times2  = data[data[list(self.params["km_filter"].keys())[0]] >= cutoffs[1]][self.params["label_ids"][1]]
-                    status2 = data[data[list(self.params["km_filter"].keys())[0]] >= cutoffs[1]][self.params["label_ids"][0]]
+                    else:
+                        cutoffs = self.params["km_filter"][list(self.params["km_filter"].keys())[0]]
+                        cutoffs = (cutoffs[0], cutoffs[1])
+                        times1  = data[data[list(self.params["km_filter"].keys())[0]] <= cutoffs[0]][self.params["label_ids"][1]]
+                        status1 = data[data[list(self.params["km_filter"].keys())[0]] <= cutoffs[0]][self.params["label_ids"][0]]
+                        times2  = data[data[list(self.params["km_filter"].keys())[0]] > cutoffs[1]][self.params["label_ids"][1]]
+                        status2 = data[data[list(self.params["km_filter"].keys())[0]] > cutoffs[1]][self.params["label_ids"][0]]
 
-                    ax      = self._kaplan_meier_estimator(times1, status1, ax, list(self.params["km_filter"].keys())[0]+" <= "+str(cutoffs[0]))
-                    ax      = self._kaplan_meier_estimator(times2, status2, ax, list(self.params["km_filter"].keys())[0]+" >= "+str(cutoffs[1]))
+                    if times1.shape[0] > 0 and times2.shape[0]> 0:
+                        ax      = self._kaplan_meier_estimator(times1, status1, ax, list(self.params["km_filter"].keys())[0]+" <= "+str(cutoffs[0]))
+                        ax      = self._kaplan_meier_estimator(times2, status2, ax, list(self.params["km_filter"].keys())[0]+" >(=) "+str(cutoffs[1]))
 
-                    results = logrank_test(times1, times2, event_observed_A=status1, event_observed_B=status2)
-                    km_results["class"].append(class_key) # <- added on 250825
-                    km_results["cutoff"].append(cutoffs) # <- added on 250825
-                    km_results["statistic"].append(results.test_statistic) # <- added on 250825
-                    km_results["pvalue"].append(results.p_value) # <- added on 250825
+                        results = logrank_test(times1, times2, event_observed_A=status1, event_observed_B=status2)
+                        km_results["class"].append(class_key) # <- added on 250825
+                        km_results["size 1"].append(times1.shape[0]) # <- added on 251101
+                        km_results["size 2"].append(times2.shape[0]) # <- added on 251101
+                        km_results["cutoff"].append(cutoffs) # <- added on 250825
+                        km_results["statistic"].append(results.test_statistic) # <- added on 250825
+                        km_results["pvalue"].append(results.p_value) # <- added on 250825
 
-                    plt.title(str(class_key)+", pvalue:"+str(round(results.p_value, 4)))
-                    if self.params["show_plot"] == True: plt.show()
+                        plt.title(str(class_key)+", pvalue:"+str(round(results.p_value, 4)))
+                        if self.params["show_plot"] == True: plt.show()
                 
-                # <- modified on 250825
                 else:
                     observed_opt_stat, observed_opt_pvalue, observed_opt_cutoff = self.kaplan_meier_max_stats(data)
 
@@ -245,8 +225,11 @@ class Survival_analysis_utils(Plot_utils):
                     status2 = data[data[list(self.params["km_filter"].keys())[0]] > observed_opt_cutoff][self.params["label_ids"][0]]
                     ax      = self._kaplan_meier_estimator(times1, status1, ax, list(self.params["km_filter"].keys())[0]+" <= "+str(observed_opt_cutoff))
                     ax      = self._kaplan_meier_estimator(times2, status2, ax, list(self.params["km_filter"].keys())[0]+" >= "+str(observed_opt_cutoff))
+
                     results = logrank_test(times1, times2, event_observed_A=status1, event_observed_B=status2)
                     km_results["class"].append(class_key)
+                    km_results["size 1"].append(times1.shape[0])
+                    km_results["size 2"].append(times2.shape[0])
                     km_results["cutoff"].append(observed_opt_cutoff)
                     km_results["statistic"].append(observed_opt_stat)
                     km_results["pvalue"].append(observed_opt_pvalue)
@@ -270,7 +253,6 @@ class Survival_analysis_utils(Plot_utils):
             times2  = data[data[list(self.params["km_filter"].keys())[0]] > cutoff][self.params["label_ids"][1]]
             status2 = data[data[list(self.params["km_filter"].keys())[0]] > cutoff][self.params["label_ids"][0]]
             results = logrank_test(times1, times2, event_observed_A=status1, event_observed_B=status2)
-            #print(cutoff, results.test_statistic, max_stat, max_cutoff)
 
             if results.test_statistic > max_stat:
                 max_stat   = results.test_statistic
@@ -307,9 +289,6 @@ class Survival_analysis_utils(Plot_utils):
     def load(self):
         if os.path.isfile(self.params["data_dir"]+self.os_sep+self.params["fname"]) == True:
             self.data = pd.read_csv(self.params["data_dir"]+self.os_sep+self.params["fname"], delimiter=self.params["separator"], index_col=False)
-            #self.data = self.data[self.data["ID:specimen time"] == 0]
-            #self.data = self.data[~self.data["FEATURE:prediction"].isna()]
-            #self.data["FEATURE:target"] = [self.data.iloc[i].loc["FEATURE:target"]*self.data.iloc[i].loc["FEATURE:ptc_mutations"] for i in range(self.data.shape[0])]
 
         else:
             print("<", self.params["data_dir"]+self.os_sep+self.params["fname"], "not found.")
@@ -326,9 +305,6 @@ class Survival_analysis_utils(Plot_utils):
                 if self.data[self.data[col] == "-"].shape[0] > 0:
                     print("<", self.data[self.data[col] == "-"].shape[0], "times '-' was found in", col+".")
                     exit()
-
-                #if self.data[self.data[col].isna()].shape[0] > 0:
-                #    print("<", self.data[self.data[col].isna()].shape[0], "times 'None' was found in", col+".") # <- silenced on 250624
 
         init_shape = self.data.shape[0]
         self.data  = self.data[~self.data[self.params["label_ids"][0]].isna()]
@@ -367,13 +343,9 @@ class Survival_analysis_utils(Plot_utils):
             if class_key != "total": data = self.data[self.data[self.params["cox_filter"]["class"]] == class_key]
             else:                    data = self.data
             
-            # marked (<-) added / removed on 250521
-            # print("<", class_key+" ("+str(data.shape[0])+")") # <- removed
-            print("<", str(class_key)+" ("+str(data.shape[0])+")") # <- added
+            print("<", str(class_key)+" ("+str(data.shape[0])+")")
             scores = self.cox_regression(data)
-            # marked (<-) added / removed on 250521
-            # cox_regression_results = self._run_cox_regression(cox_regression_results, scores, class_key) # <- removed
-            cox_regression_results = self._run_cox_regression(cox_regression_results, scores, str(class_key)) # <- added
+            cox_regression_results = self._run_cox_regression(cox_regression_results, scores, str(class_key))
 
             # create second local copy of data
             value_data = data
@@ -381,7 +353,6 @@ class Survival_analysis_utils(Plot_utils):
             if "value" in self.params["cox_filter"]:
                 for filter_value in self.params["cox_filter"]["value"][list(self.params["cox_filter"]["value"].keys())[0]]:
                     value_data             = value_data[value_data[list(self.params["cox_filter"]["value"].keys())[0]] >= filter_value]
-                    # print("<", class_key, filter_value+" ("+str(value_data.shape[0])+")") # <- removed on 250704
                     print("<", class_key, str(filter_value)+" ("+str(value_data.shape[0])+")") # <- added on 250704
                     scores                 = self.cox_regression(value_data)
                     cox_regression_results = self._run_cox_regression(cox_regression_results, scores, class_key+"_"+str(filter_value))
@@ -405,7 +376,3 @@ class Survival_analysis_utils(Plot_utils):
         pd.set_option('display.max_columns', None)
         print(cox_regression_results[[col for col in cox_regression_results.columns if "p-adj" in col]])
         return cox_regression_results
-        # <- to here
-
-        # <- removed on 250823
-        # return pd.DataFrame(cox_regression_results, index=scores.index).sort_index()

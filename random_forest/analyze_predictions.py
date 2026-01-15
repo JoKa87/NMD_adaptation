@@ -1,4 +1,4 @@
-import copy # <- added on 250612
+import copy
 import os
 import sys
 parent_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
@@ -6,81 +6,83 @@ sys.path.insert(0, parent_dir+"\\plots")
 
 from analyze_predictions_utils import *
 from plot_utils import *
-from profiles import * # <- marked added on 250709
+from profiles import *
+
 
 # parameters
 params = {
-         "analysis_steps"               : 2, # <- added on 250705
-         "apply_3mers"                  : False, # <- added on 250620
+         "analysis_steps"               : 2,
+         "apply_3mers"                  : True,
          "apply_cutoff"                 : False, # if True NMD escape and target cutoffs are applied for selection analysis, if False internal reference (avg. model prediction) is used
          "apply_global_predictions"     : False, # if True, randomized subset of global predictions is used for testing, "apply_cutoff" auto-set to True nmd_escape_cutoff and nmd_target_cutoff set to subset average
-         "apply_mutation_stats"         : False, # <- added on 250603
-         "apply_mutation_weights"       : False, # <- added on 250824
+         "apply_mutation_stats"         : True,
+         "apply_mutation_weights"       : False,
          "appris_priorities"            : ["PRINCIPAL:1", "PRINCIPAL:2", "PRINCIPAL:3", "PRINCIPAL:4", "PRINCIPAL:5", "ALTERNATIVE:1", "ALTERNATIVE:2", "MINOR"],
          "appris_selection"             : False,
-         "average_indel_probabilities"  : True, # <- added on 250623
-         "block"                        : None, # "ID:cancer type" "ID:project" None
+         "average_indel_probabilities"  : True,
+         "block"                        : "ID:sample id", # "ID:cancer type" "ID:project" None
          "block_targets"                : ["ID:project", "ID:case id"],
-         "bootstrapping_steps"          : 100000, # <- added on 250607, required if apply_mutation_stats=True
+         "bootstrapping_steps"          : 100000,
          "create_newdir"                : True,
          "data_dir"                     : parent_dir+r"\data",
-         # list of errors specified in create_genome_predictions ("cds_mismatch" should better be name "lindeboom_cds_mismatch" as checking Lindeboom cds size)
-         # ['cds_mismatch', 'chromosome_not_found', 'last_ejc_unknown',
-         # 'lindeboom_cds_size_error', 'lindeboom_exon_index_error', 'lindeboom_exon_size_error', 'lindeboom_not_found', 'lindeboom_size_test_error',
-         # 'total_exon_size_unknown']
          "error_filter"                 : ["chromosome_not_found", "total_exon_size_unknown"], #["chromosome_not_found", "total_exon_size_unknown"], 
          "exon_resolution"              : True,
-         "file_tag"                     : "tcga",
+         "file_tag"                     : "control_projectwise",
          "filters"                      : [], #
          "global_dir"                   : parent_dir+r"\data",
          "global_predictions_path"      : r"", # fill in path to pre-calculated stats file
          "harmonize"                    : True, # if True predictions and variants are harmonized based on variant_filter_col
          "hist_steps"                   : 100,
-         "id_filter"                    : "TCGA", # "Cuomo" "MSK" "TCGA" "Teran" 
-         "knowngene_fname"              : "hg38_knownGene.txt",
+         "id_filter"                    : "custom", # "CPTAC3" "Cuomo" "MSK" "TCGA" "Teran" 
+         "knowngene_fname"              : "hg38_knownGene_appended.txt",
          "load_lindeboom"               : False,
          "lindeboom_fnames"             : ["hg38_lindeboom_predictions.txt"], # "h38_lindeboom_predictions.txt" "hg38_NMDetectiveA_Lindeboom_et_al.v2.gtf"
          "mapping_target"               : "transcript id", # "gene id" "transcript id"
          "masks"                        : ["frameshift", "nonsense"], # "frameshift" "nonsense" [] <- added on 250528
-         # "analyze_blocks" "analyze_predictions" "analyze_selection" "analyze_stop_codons" "convert_lindeboom_predictions" "show_stats"
+         # "analyze_adaptation" "analyze_blocks" "analyze_predictions" "analyze_selection" "analyze_stop_codons" "convert_lindeboom_predictions" "show_stats"
+         "min_patients"                 : 10, # added on 251024
          "mode"                         : "analyze_predictions",
          "mutation_stats_del_scale"     : 1, # <- added on 250614 to adjust indel probabilities to ratio of observed to projected frameshift mutations with scale 1
-         "mutation_stats_fname"         : "tcga_mutation_stats.json", # <- added on 250603
+         "mutation_stats_fname"         : "mutation_stats.json", # <- added on 250603
          "mutation_stats_gene_target"   : "total", # <- added on 250603, in project-wise mode, None forces values to be replaced by current block
          "mutation_stats_ins_scale"     : 1, # <- added on 250614 to adjust indel probabilities to ratio of observed to projected frameshift mutations with scale 1
          "mutation_stats_non_scale"     : 1, # <- added on 250624 to adjust indel probabilities to ratio of observed to projected nonsense mutations with scale 1
          "mutation_stats_pair_target"   : "total", # <- added on 250603, in project-wise mode, None forces values to be replaced by current block
          "mutation_stats_ptc_weights"   : False, # <- added on 250821, allows application of PTC weights during masking (overwrites empirical gene factors)
-         "mutation_stats_scale"         : 1, # <- added on 250612
-         "nmd_escape_cutoff"            : 0.57, # 250513 0.570 241128
-         "nmd_target_cutoff"            : 0.64, # 250513 0.630 241128
+         "mutation_stats_scale"         : 1, 
+         "nmd_escape_cutoff"            : 0.57,
+         "nmd_target_cutoff"            : 0.64,
          "os_sep"                       : "\\",
          "plot_projections"             : True,
          "polynomial_degree"            : 9,
-         "prediction_fnames"            : ["hg38_NMD_susceptibilities.txt"], # contains exon correction
+         "prediction_fnames"            : ["hg38_NMD_scores_appended_appended.txt"], # "hg38_NMD_scores_appended_appended.txt" contains exon correction
          "profile"                      : "tcga", # if None this field is ignored <- added on 250709
          "projection_cutoff"            : 20,
+         "random_sample_size"           : None, # if None this field is ignored <- added on 251030
          "remove_inconsistencies"       : True, # <- added on 250704
          "transformation_steps"         : 100,
-         "selection_cols"               : {"gene symbol": "ID:gene symbol", "sample id": "ID:sample id", "cancer type": "ID:cancer type"},
-         "selection_fname"              : "tcga_selection_stats.txt",
+         "selection_cols"               : {"gene symbol": "ID:gene symbol"}, #"project": "ID:project", "case id": "ID:case id", "sample id": "ID:sample id"},
+         #"selection_cols"               : {"gene symbol": "ID:gene symbol", "sample id": "ID:sample id", "cancer type": "ID:cancer type"},
+         "selection_fname"              : "tcga_frameshift_projectwise",
          "selected_genes"               : ["ENSG00000134086"],
          "selection_method"             : "binomial", # "binomial" "bootstrapping" "fishers exact" "fishers exact escape" "fishers exact target"
+         "selection_minsize"            : 10, # <- added on 251021 to allow exclusion of low-counting variants, "None" to switch off
          "selection_mode"               : "relative", # "absolute" "relative"
          "selection_output_type"        : "GOrilla", # output type: "gProfiler" (http://biit.cs.ut.ee/gprofiler/gost), "GOrilla" (https://cbl-gorilla.cs.technion.ac.il/)
          "selected_transcripts"         : ["ENST00000269305.9", "ENST00000257430.9"], # ENST00000256474.3
+         "seq_fname"                    : "hg38_seqs_appended.txt", # <- added on 251111
          "shared_variants"              : False,
          "shared_variants_cases"        : False,
          "shared_variants_filter"       : 2,
          "stats_mode"                   : "values", # "means" "values"
-         "status_fname"                 : "tcga_data_info.json",
+         "status_fname"                 : "filtered_status_ptc.json",
          "tcga_filter"                  : "biallelic_only", # "biallelic_only" "off"
          "use_variant_filter"           : False, # variant filter specified in variant_filter_fnames is loaded and applied to predictions and variants
          "variant_filter_col"           : "ID:transcript id",
-         "variant_filter_fnames"        : ["tcga_variants.txt"],
+         "variant_filter_fnames"        : ["tcga.txt"],
          # if "_EXCLUDED" is added to key, all values but indicated one are included 
          "variant_filter_value_filter"  : {"ID:ptc reads": 1, "ID:cnv total_EXCLUDED": [0], "FEATURE:prediction": 0, "ID:multiple indels": [False]}, # "FEATURE:frameshift_IDENTICAL": 0}, # {"ID:ptc reads": 1, "ID:cnv total_EXCLUDED": [0]}, #}, # "ID:cancer type": ["Non-Small Cell Lung Cancer"]
-         "variant_fnames"               : ["tcga_variants.txt"],
+         "variant_fnames"               : ["control_filtered_appended.txt"],
          "variants_only"                : False, # if True only variant data are projected
          "variant_targets"              : {
                                            "FEATURE:prediction"              : "FEATURE:abs. ptc index",
@@ -91,7 +93,7 @@ params = {
          "variant_value_filter"         : {"ID:ptc reads": 1, "ID:cnv total_EXCLUDED": [0], "FEATURE:prediction": 0, "ID:multiple indels": [False], "ID:variant classification": ["Frame_Shift_Del", "Frame_Shift_Ins"]},# "FEATURE:frameshift_IDENTICAL": 0} # , "FEATURE:frameshift_IDENTICAL": 0, "ID:variant classification": ["Nonsense_Mutation"]}, # minimum expression for variants to be included in the analysis "ID:ptc reads": 0
          }
 
-# marked (<-) if-condition added on 250709
+
 if params["profile"] != None:
     params = apply_profile(params)
 
@@ -103,12 +105,6 @@ if params["load_lindeboom"] == True and len(params["variant_targets"]) > 0:
     print("< variant targets are incompatible with lindeboom options due to deviating absolute positions.")
     exit()
 
-# if-condition (<-) added on 250528
-if len(params["masks"]) > 0 and params["harmonize"] == False:
-    print("< masking currently requires harmonization with variants providing CDS information.")
-    exit()
-
-# if-condition (<-) added on 250605
 if len(params["masks"]) == 0 and params["apply_mutation_stats"] == True:
     print("< mask must be specified in order to apply mutation stats")
     exit()
@@ -116,18 +112,14 @@ if len(params["masks"]) == 0 and params["apply_mutation_stats"] == True:
 # initialize class
 print(params["file_tag"])
 
-# <- if... else-statements added on 250623
-#if params["mode"] == "analyze_predictions" and params["apply_mutation_stats"] == True:
-if params["mode"] == "analyze_predictions" and (params["apply_mutation_stats"] == True or params["apply_mutation_weights"] == True): # recheck
+if (params["mode"] == "analyze_predictions" or params["mode"] == "analyze_adaptation") and (params["apply_mutation_stats"] == True or params["apply_mutation_weights"] == True): # recheck
     with open(params["data_dir"]+params["os_sep"]+params["mutation_stats_fname"], "r") as f:
         mutation_stats = json.load(f)
 
 else:
     mutation_stats = {}
 
-# marked (<-) added / removed on 250613
-# apu = Analyze_predictions_utils(params) # <- removed
-apu = Analyze_predictions_utils(params, mutation_stats) # <- added
+apu = Analyze_predictions_utils(params, mutation_stats)
 
 if params["apply_global_predictions"] == True:
     params["apply_cutoff"]      = True
@@ -138,7 +130,6 @@ if params["apply_global_predictions"] == True:
     print("< mean", np.mean(apu.global_predictions), len(apu.global_predictions))
 
 
-# marked (<-) on 250705
 def _adjust_probabilities(mutation_stats, target):
     # apply empirical correction to adjust frameshift probabilities
     for key1 in ["del-1", "del-1_3mers"]:
@@ -184,13 +175,10 @@ def _analyze_predictions():
     print("<", apu.variants.drop_duplicates(subset=params["variant_filter_col"]).shape[0], "mutated genes and",
                apu.predictions.drop_duplicates(subset=params["variant_filter_col"].replace("ID:", "")).shape[0], "reference genes are analyzed")
 
-    # marked (<-) if-condition added to copy relevant data before entering the for-loop
     if params["analysis_steps"] > 1:
         predictions = apu.predictions.applymap(copy.deepcopy)
 
-    # marked (<-) for-loop added on 250725, unless explicitly marked the contained code is old (only indention was changed)
     for step in range(params["analysis_steps"]):
-        # marked (<-) if-condition added to re-initialize containers if multiple steps were selected
         if step > 0:
             apu.masking_stats = pd.DataFrame()
             apu.predictions   = predictions.applymap(copy.deepcopy)
@@ -199,7 +187,6 @@ def _analyze_predictions():
         # map variants to predictions
         apu.map_variants()
 
-        # marked (<-) if-condition added on 250725, unless explicitly marked the contained code is old (only indention was changed)
         if step == params["analysis_steps"]-1:
             # conduct selection tests for all variants combined
             apu.analyze_total_selection()
@@ -232,10 +219,10 @@ def _analyze_predictions():
         if params["mode"] == "analyze_predictions" and params["apply_mutation_stats"] == True:
             apu.masking_stats["gene symbol"]         = [apu.variants[apu.variants["ID:transcript id"] == apu.masking_stats.iloc[i].loc["transcript id"]].iloc[0].loc["ID:gene symbol"]
                                                         for i in range(apu.masking_stats.shape[0])]
-            frameshift_variants                      = apu.variants[apu.variants["ID:variant classification"].isin(["Frame_Shift_Del", "Frame_Shift_Ins"])]
-            nonsense_variants                        = apu.variants[apu.variants["ID:variant classification"] == "Nonsense_Mutation"]
-            deletion_variants                        = apu.variants[apu.variants["ID:variant classification"].isin(["Frame_Shift_Del"])]
-            insertion_variants                       = apu.variants[apu.variants["ID:variant classification"].isin(["Frame_Shift_Ins"])]
+            frameshift_variants                      = apu.variants[apu.variants["ID:variant classification"].isin(["frame_shift_del", "frame_shift_ins"])]
+            nonsense_variants                        = apu.variants[apu.variants["ID:variant classification"] == "nonsense"]
+            deletion_variants                        = apu.variants[apu.variants["ID:variant classification"].isin(["frame_shift_del"])]
+            insertion_variants                       = apu.variants[apu.variants["ID:variant classification"].isin(["frame_shift_ins"])]
 
             apu.masking_stats["observed frameshift"] = [frameshift_variants[frameshift_variants["ID:transcript id"] == apu.masking_stats.iloc[i].loc["transcript id"]].shape[0]
                                                         for i in range(apu.masking_stats.shape[0])]
@@ -320,9 +307,13 @@ if params["mode"] == "analyze_blocks":
     apu.analyze_blocks(status)
 
 
-if params["mode"] == "analyze_predictions" or params["mode"] == "analyze_selection":
+if params["mode"] == "analyze_adaptation" or params["mode"] == "analyze_predictions" or params["mode"] == "analyze_selection":
     # load data
     if params["mode"] != "analyze_selection":
+        apu.seqs       = pd.read_csv(params["data_dir"]+params["os_sep"]+params["seq_fname"])
+        apu.seqs       = apu.seqs[[True if len(apu.seqs.iloc[i].loc["cds"]) % 3 == 0 else False for i in range(apu.seqs.shape[0])]]
+        apu.seqs.index = [apu.seqs.iloc[i].loc["transcript id"].split(".")[0] for i in range(apu.seqs.shape[0])]
+
         # <- if-condition added on 250603
         if params["apply_mutation_stats"] == True:
             if params["average_indel_probabilities"] == True:
@@ -346,24 +337,29 @@ if params["mode"] == "analyze_predictions" or params["mode"] == "analyze_selecti
         apu.load(params["variant_fnames"], mode="variants")
 
 
-    if params["block"] != None:
+    if params["mode"] != "analyze_adaptation" and params["block"] != None:
         file_tag = params["file_tag"]
 
-        # marked (<-) added on 250706
-        set_gene_target = False; set_pair_target = False # <- added
-        if params["mutation_stats_gene_target"] == None: set_gene_target = True # <- added
-        if params["mutation_stats_pair_target"] == None: set_pair_target = True # <- added
+        set_gene_target = False; set_pair_target = False
+        if params["mutation_stats_gene_target"] == None: set_gene_target = True
+        if params["mutation_stats_pair_target"] == None: set_pair_target = True
 
         # copy attribute state
         if params["mode"] != "analyze_selection":
-            # marked (<-) added on 250709
             if params["harmonize"] == True:
                 apu.predictions = apu.apply_variant_filter(apu.predictions, params["variant_filter_col"].replace("ID:", ""), params["variant_filter_col"], mode="variants")
             
-
-            # marked (<-) added / removed on 250612
             #predictions = apu.predictions # <- removed
-            predictions = apu.predictions.applymap(copy.deepcopy) # <- added
+            predictions    = apu.predictions.applymap(copy.deepcopy)
+            mutation_stats = copy.deepcopy(apu.mutation_stats)
+            
+            if "patientwise" in params["profile"]:
+                sample_ids          = np.unique(apu.variants[params["block"]])
+                filtered_sample_ids = [sample_id for sample_id in sample_ids
+                                       if apu.variants[apu.variants[params["block"]] == sample_id].shape[0] >= params["min_patients"]]
+                apu.variants        = apu.variants[apu.variants[params["block"]].isin(filtered_sample_ids)]
+                print("<", len(filtered_sample_ids), "patients selected.")
+            
             variants    = apu.variants
             blocks      = apu.variants.drop_duplicates(subset=params["block"])[params["block"]].tolist()
             print(blocks)
@@ -380,27 +376,47 @@ if params["mode"] == "analyze_predictions" or params["mode"] == "analyze_selecti
             apu.means          = {"gene id": [], "mean": []}
 
             if params["mode"] != "analyze_selection":
-                # marked (<-) added / removed on 260612
-                #apu.predictions = predictions # <- removed
-                apu.predictions = predictions.applymap(copy.deepcopy) # <- added
-                apu.stats       = None
-                apu.variants    = variants[variants[params["block"]] == block]
+                apu.predictions    = predictions.applymap(copy.deepcopy)
+                apu.stats          = None
+                apu.variants       = variants[variants[params["block"]] == block]
+                apu.mutation_stats = copy.deepcopy(mutation_stats)
 
-                # marked (<-) added on 250603
-                if params["apply_mutation_stats"] == True: # <- added
-                    apu.masking_stats = pd.DataFrame() # <- added
-                    if set_gene_target == True: params["mutation_stats_gene_target"] = block # <- added
-                    if set_pair_target == True: params["mutation_stats_pair_target"] = block # <- added
+                if "projectwise" in params["profile"]:
+                    apu.masking_stats = pd.DataFrame()
+                    if set_gene_target == True: params["mutation_stats_gene_target"] = block
+                    if set_pair_target == True: params["mutation_stats_pair_target"] = block
+                
+                if "patientwise" in params["profile"]:
+                    apu.masking_stats = pd.DataFrame()
 
-            if params["mode"] == "analyze_predictions": _analyze_predictions()
-            if params["mode"] == "analyze_selection":   _analyze_selection(block)
+                    if params["id_filter"] == "MSK":
+                        if set_gene_target == True: params["mutation_stats_gene_target"] = apu.variants.iloc[0].loc["ID:cancer type"]
+                        if set_pair_target == True: params["mutation_stats_pair_target"] = apu.variants.iloc[0].loc["ID:cancer type"]
+
+                    elif params["id_filter"] == "CPTAC3" or params["id_filter"] == "TCGA":
+                        if set_gene_target == True: params["mutation_stats_gene_target"] = apu.variants.iloc[0].loc["ID:project"]
+                        if set_pair_target == True: params["mutation_stats_pair_target"] = apu.variants.iloc[0].loc["ID:project"]
+
+                    else:
+                        print("< unknown datatype", params["datatype"])
+                        exit()
+
+            if params["mode"] == "analyze_adaptation" or params["mode"] == "analyze_predictions":
+                _analyze_predictions()
+                if params["mode"] == "analyze_adaptation": apu.analyze_adaptation()
+
+            if params["mode"] == "analyze_selection":
+                _analyze_selection(block)
 
     else:
-        if params["mode"] == "analyze_predictions": _analyze_predictions()
-        if params["mode"] == "analyze_selection":   _analyze_selection()
+        if params["mode"] == "analyze_adaptation" or params["mode"] == "analyze_predictions":
+            _analyze_predictions()
+            if params["mode"] == "analyze_adaptation": apu.analyze_adaptation()
+
+        if params["mode"] == "analyze_selection":
+             _analyze_selection()
 
 
-# if-statement (<-) added on 250528
 if params["mode"] == "analyze_stop_codons":
     if params["use_variant_filter"] == True: apu.load(params["variant_filter_fnames"], mode="variant_filter")
     apu.load(params["variant_fnames"], mode="variants")
@@ -417,12 +433,16 @@ if params["mode"] == "convert_lindeboom_predictions":
 
 
 if params["mode"] == "show_stats":
+    apu.seqs       = pd.read_csv(params["data_dir"]+params["os_sep"]+params["seq_fname"])
+    apu.seqs       = apu.seqs[[True if len(apu.seqs.iloc[i].loc["cds"]) % 3 == 0 else False for i in range(apu.seqs.shape[0])]]
+    apu.seqs.index = [apu.seqs.iloc[i].loc["transcript id"].split(".")[0] for i in range(apu.seqs.shape[0])]
+
     pu = Plot_utils()
     apu.load(params["prediction_fnames"], mode="predictions", loading_key={"transcript id": params["selected_transcripts"]})
     apu.load(params["variant_fnames"], mode="variants", loading_key={"ID:transcript id": [transcript.split(".")[0] for transcript in params["selected_transcripts"]]})
     apu.map_variants()
 
-    gene_symbols = {"ENST00000269305": "TP53", "ENST00000257430": "APC"} # "ENST00000256474": "VHL"}
+    gene_symbols = {"ENST00000269305": "TP53", "ENST00000257430": "APC"}
     for transcript_id in params["selected_transcripts"]:
         fig, ax = plt.subplots(1, 2)
 
@@ -434,12 +454,11 @@ if params["mode"] == "show_stats":
                     "real positions"        : apu.predictions.loc[transcript_id].loc["variant targets"]["FEATURE:ptc cds position"],
                     "real predictions"      : apu.predictions.loc[transcript_id].loc["variant targets"]["FEATURE:prediction"]}
 
-            # marked (<-) added on 250529
-            if len(params["masks"]) > 0: remove_placeholders = True # <- added
-            else:                        remove_placeholders = False # <- added
+            if len(params["masks"]) > 0: remove_placeholders = True
+            else:                        remove_placeholders = False
 
             ax[0] = pu.plot_coordinates(ax[0], data, features={"label"               : gene_symbols[transcript_id],
-                                                               "remove_placeholders" : remove_placeholders, # <- added on 250529
+                                                               "remove_placeholders" : remove_placeholders,
                                                                "stats"               : True,
                                                                "xlabel"              : "coordinate",
                                                                "ylabel"              : "NMD score",
@@ -447,7 +466,7 @@ if params["mode"] == "show_stats":
 
             ax[1] = pu.plot_gene_histogram(ax[1], data, features={"bins"                : 20,
                                                                   "label"               : gene_symbols[transcript_id],
-                                                                  "remove_placeholders" : remove_placeholders, # <- added on 250529
+                                                                  "remove_placeholders" : remove_placeholders,
                                                                   "prediction_mode"     : "histogram",
                                                                   "stats"               : True,
                                                                   "xlabel"              : "NMD score",
