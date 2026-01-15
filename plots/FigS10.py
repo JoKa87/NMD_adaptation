@@ -1,3 +1,4 @@
+import copy
 import os
 
 from plot_load import *
@@ -8,166 +9,136 @@ parent_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
 
 
 def main():
-    boxplot_colors = []
-    [boxplot_colors.extend(["crimson", "royalblue"]) for _ in range(34)]
-
     # params #
-    data = [
-            {
-            "data"          : [],
-            "datatype"      : ["pandas", "pandas"],
-            "extensions"    : [None, None],
-            "features"      : {
-                              "bar_label"   : "sample \n fraction",
-                              "cmap"        : "Blues",
-                              "tag"         : "escape",
-                              "xcol"        : [[None], [None]],
-                              "xmute"       : True,
-                              "ymute"       : True,
-                              "ycol"        : "block id"
-                               },
-            "off"           : False,
-            "paths"         : [[parent_dir+r"\data\prediction_analysis_msk\2025-11-14_18-46-51_msk\2025-11-15_11-28-36_binomial\selection_stats.txt"],
-                               [parent_dir+r"\data\msk_chord_2024\msk_chord_zeros_included_filtered_appended.txt"]],
-            "separators"    : [",", ","],
-            "type"          : "matrix"
-            },
-            {
-            "data"          : [],
-            "datatype"      : ["pandas", "pandas"],
-            "extensions"    : [None, None],
-            "features"      : {
-                              "bar_label"   : "sample \n fraction",
-                              "cmap"        : "twilight",
-                              "tag"         : "escape",
-                              "xcol"        : [[None], [None]],
-                              "xmute"       :  True,
-                              "ycol"        : "block id"
-                               },
-            "off"           : False,
-            "paths"         : [[parent_dir+r"\data\prediction_analysis_msk\2025-11-14_18-46-51_msk\2025-11-15_11-28-36_binomial\selection_stats.txt"],
-                               [parent_dir+r"\data\TCGA.PanCancer.onco.genes.OncoVar.tsv"]],
-            "separators"    : [",", "\t"],
-            "target_cols"   : ["OncoKB", "2020Rule", "CTAT"],
-            "type"          : "matrix2"
-            },
-            {
-            "data"          : [],
-            "datatype"      : ["pandas", "pandas"],
-            "extensions"    : [None, None],
-            "features"      : {
-                              "bar_label"   : "sample \n fraction",
-                              "cmap"        : "Reds",
-                              "tag"         : "target",
-                              "xcol"        : [[None], [None]],
-                              "ycol"        : "block id",
-                              "ymute"       : True
-                               },
-            "off"           : False,
-            "paths"         : [[parent_dir+r"\data\prediction_analysis_msk\2025-11-14_18-46-51_msk\2025-11-15_11-28-36_binomial\selection_stats.txt"],
-                               [parent_dir+r"\data\msk_chord_2024\msk_chord_zeros_included_filtered_appended.txt"]],
-            "separators"    : [",", ","],
-            "type"          : "matrix"
-            },
-            {
-            "data"          : [],
-            "datatype"      : ["pandas", "pandas"],
-            "extensions"    : [None, None],
-            "features"      : {
-                              "bar_label"   : "sample \n fraction",
-                              "cmap"        : "twilight",
-                              "scale"       : (0, 0.5),
-                              "tag"         : "target",
-                              "xcol"        : [[None], [None]],
-                              "xmute"       :  True,
-                              "ycol"        : "block id"
-                               },
-            "off"           : False,
-            "paths"         : [[parent_dir+r"\data\prediction_analysis_msk\2025-11-14_18-46-51_msk\2025-11-15_11-28-36_binomial\selection_stats.txt"],
-                               [parent_dir+r"\data\TCGA.PanCancer.onco.genes.OncoVar.tsv"]],
-            "separators"    : [",", "\t"],
-            "target_cols"   : ["OncoKB", "2020Rule", "CTAT"],
-            "type"          : "matrix2"
-            },
-        ]
+    template1 = {
+                "data"          : [],
+                "datatype"      : ["pandas"],
+                "extensions"    : [None],
+                "features"      : {
+                                  "color":      "lightgray",
+                                  "edgecolor":  "dimgray",
+                                  "pair":       "FEATURE:ptc_mutations2_FEATURE:prediction",
+                                  "switch_axes": False,
+                                  "stats":       "spearman",
+                                  "xcol":        [[None]],
+                                  "xlabel":      "ptc mutations",
+                                  "ylabel":      "NMD susceptibility"
+                                  },
+                "off"           : False,
+                "paths"         : [],
+                "separators"    : [","],
+                "type"          : "correlation"
+                }
+    
+    template2 = {
+                "data"          : [],
+                "datatype"      : ["pandas"],
+                "extensions"    : [None],
+                "features"      : {
+                                  "color":      "lightgray",
+                                  "edgecolor":  "dimgray",
+                                  "pair":       "FEATURE:ptc_mutations2_ID:cnv total",
+                                  "switch_axes": False,
+                                  "stats":       "spearman",
+                                  "xcol":        [[None]],
+                                  "xlabel":      "ptc mutations",
+                                  "ylabel":      "CNV total"
+                                  },
+                "off"           : False,
+                "paths"         : [],
+                "separators"    : [","],
+                "type"          : "correlation"
+                }
+    
+    template3 = {
+                "data"          : [],
+                "datatype"      : ["pandas"],
+                "extensions"    : [None],
+                "features"      : {
+                                  "color":      "lightgray",
+                                  "edgecolor":  "dimgray",
+                                  "pair":       "FEATURE:ptc_mutations2_fpkm_unstranded",
+                                  "switch_axes": False,
+                                  "stats":       "spearman",
+                                  "xcol":        [[None]],
+                                  "xlabel":      "ptc mutations",
+                                  "ylabel":      "NMD activity"
+                                  },
+                "off"           : False,
+                "paths"         : [],
+                "separators"    : [","],
+                "type"          : "correlation"
+                }
+    
+    data             = [copy.deepcopy(template1) for _ in range(6)]
+    data[0]["paths"] = [parent_dir+r"\data\2025-06-23_16-06-47_TCGA_NMD_targets_analysis_FPKM_exp_ccorr\ptc50_nmd1_class1\stats_summary.txt"]
+    data[1]["paths"] = [parent_dir+r"\data\2025-06-23_16-06-47_TCGA_NMD_targets_analysis_FPKM_exp_ccorr\ptc50_nmd1_class2\stats_summary.txt"]
+    data[2]["paths"] = [parent_dir+r"\data\2025-06-23_16-06-47_TCGA_NMD_targets_analysis_FPKM_exp_ccorr\ptc50_class1\stats_summary.txt"]
+    data[3]["paths"] = [parent_dir+r"\data\2025-06-23_16-06-47_TCGA_NMD_targets_analysis_FPKM_exp_ccorr\ptc50_class2\stats_summary.txt"]
+    data[4]["paths"] = [parent_dir+r"\data\2025-06-23_16-06-47_TCGA_NMD_targets_analysis_FPKM_exp_ccorr\class_selection_ptc50_class1\stats_summary.txt"]
+    data[5]["paths"] = [parent_dir+r"\data\2025-06-23_16-06-47_TCGA_NMD_targets_analysis_FPKM_exp_ccorr\class_selection_ptc50_class2\stats_summary.txt"]
 
-    dims       = (7, 4)
+    data.extend([copy.deepcopy(template2) for _ in range(6)])
+    for i in range(6):
+        data[6+i]["paths"] = data[i]["paths"]
+
+    data.extend([copy.deepcopy(template3) for _ in range(6)])
+    for i in range(6):
+        data[12+i]["paths"] = data[i]["paths"]
+
+    dims       = (6, 4)
     resolution = 600
     run_dir    = parent_dir+r"\data\figures"
 
-    pu = Plot_utils()
+    # define figure
+    fig = plt.figure(figsize=(180/25.4, 180/25.4), constrained_layout=True)
+    gs  = fig.add_gridspec(dims[0], 3*dims[1]+1)
 
+    subplots = []
+    for i in range(6):
+        subplots.append(fig.add_subplot(gs[i, 0:4]))
+        subplots.append(fig.add_subplot(gs[i, 4:8]))
+        subplots.append(fig.add_subplot(gs[i, 8:]))
+    
+
+    # load data
     data = [data[i] for i in range(len(data)) if "off" not in data[i] or data[i]["off"] == False]
     data = load(data)
 
-    # define figure
-    fig = plt.figure(figsize=(180/25.4, 180/25.4), constrained_layout=True)
-    gs  = fig.add_gridspec(dims[0], 3*dims[1]+1, wspace=2)
 
-    subplots = []
-    subplots.append(fig.add_subplot(gs[0:2, 1:4]))
-    subplots.append(fig.add_subplot(gs[0:2, 0:1]))
-    subplots.append(fig.add_subplot(gs[2:4, 1:4]))
-    subplots.append(fig.add_subplot(gs[2:4, 0:1]))
+    pu = Plot_utils()
 
-    for i in range(3):
-        subplots.append(fig.add_subplot(gs[4+i, :]))
+    for i in range(len(data)):        
+        if data[i]["type"] == "correlation":
+            selected_data = data[i]["data"][0][data[i]["data"][0]["pair"] == data[i]["features"]["pair"]]
 
-    step = 0
-    for i in range(len(data)):
-        if data[i]["type"] == "matrix" or data[i]["type"] == "matrix2":
-            # aggregated value contains 
-            if data[i]["features"]["tag"] == "escape":
-                selected_data = data[i]["data"][0][[True if data[i]["data"][0].iloc[j].loc["binomial-statistic FEATURE:prediction"] > 0 else False
-                                                    for j in range(data[i]["data"][0].shape[0])]]
-                selected_data = selected_data[selected_data["block id"] != "total"]
-                selected_data = selected_data.sort_values(by=data[i]["features"]["tag"], ascending=False).iloc[0:15]
-            
-            if data[i]["features"]["tag"] == "target":
-                selected_data = data[i]["data"][0][[True if data[i]["data"][0].iloc[j].loc["binomial-statistic FEATURE:prediction"] < 0 else False
-                                                    for j in range(data[i]["data"][0].shape[0])]]
-                selected_data = selected_data[selected_data["block id"] != "total"]
-                selected_data = selected_data.sort_values(by=data[i]["features"]["tag"], ascending=False).iloc[0:15]
-
-            selected_data.index = [selected_data.iloc[i].loc["block id"] for i in range(selected_data.shape[0])]
-            selected_cols       = [col for col in selected_data.columns if data[i]["features"]["tag"] in col
-                                    and "relative" not in col and "Cancer" in col]
-            selected_data       = selected_data[selected_cols]
-
-            # add mean value
-            selected_data["all"] = selected_data.mean(axis=1)
-            selected_data        = selected_data.rename(columns={col: col.split("_")[1] for col in selected_cols})
-            data[i]["data"][0]   = selected_data            
-
-
-            if data[i]["type"] == "matrix":
-                # determine cancer type-specific counts
-                cancer_types   = np.unique(data[i]["data"][1]["ID:CANCER_TYPE"])
-                patient_counts = {**{cancer_type: data[i]["data"][1][data[i]["data"][1]["ID:CANCER_TYPE"] == cancer_type].shape[0] for cancer_type in cancer_types},
-                                  **{"all": data[i]["data"][1].shape[0]}}
+            if "switch_axes" not in data[i]["features"] or data[i]["features"]["switch_axes"] == False:
+                data[i]["data"][0] = pd.DataFrame({data[i]["features"]["xlabel"]: json.loads(selected_data.iloc[0].loc["x"]),
+                                                   data[i]["features"]["ylabel"]: json.loads(selected_data.iloc[0].loc["y"])})
                 
-                print(json.dumps(patient_counts, indent=4))
+            else:
+                data[i]["data"][0] = pd.DataFrame({data[i]["features"]["xlabel"]: json.loads(selected_data.iloc[0].loc["y"]),
+                                                   data[i]["features"]["ylabel"]: json.loads(selected_data.iloc[0].loc["x"])})
                 
-                for col in data[i]["data"][0].columns:
-                    data[i]["data"][0][col] = [data[i]["data"][0].iloc[j].loc[col] / patient_counts[col] for j in range(data[i]["data"][0].shape[0])]
+            data[i]["features"]["x"] = data[i]["features"]["xlabel"]
+            data[i]["features"]["y"] = data[i]["features"]["ylabel"]
+            subplots[i]              = pu.plot_correlation(subplots[i], data[i]["data"][0], data[i]["features"])
 
-                subplots[i] = pu.plot_matrix(subplots[i], data[i]["data"][0], data[i]["features"])
+            # <- solution added on 250911 to fix wrong label sizes (rcParams are not correctly applied, although working for plot_correlation with Fig2.py)
+            for tick in subplots[i].get_xticklabels():
+                tick.set_fontsize(6)
 
+            for tick in subplots[i].get_yticklabels():
+                tick.set_fontsize(6)
 
-            if data[i]["type"] == "matrix2":
-                data[i]["data"][1].index = data[i]["data"][1]["Gene_symbol"]
-                data[i]["data"][0]       = pd.concat(data[i]["data"], axis=1)
-                data[i]["data"][0]       = data[i]["data"][0].loc[selected_data.index]
-                data[i]["data"][0]       = data[i]["data"][0].drop(columns=[col for col in data[i]["data"][0].columns if col not in data[i]["target_cols"]])
-                data[i]["data"][0]       = data[i]["data"][0].replace({np.nan: 0, "Y": 0.3, "N": 0, "Pssible_Oncogene": 0.4, "Pssible_TSG": 0.2, "Oncogene": 0.4, "Oncogene/TSG": 0.3, "TSG": 0.2}).astype(float)
-                subplots[i] = pu.plot_matrix(subplots[i], data[i]["data"][0], data[i]["features"])
-        
-        if data[i]["type"] != "matrix2":
-            subplots[i].text(-0.1, 1.1, string.ascii_lowercase[step], transform=subplots[i].transAxes, size=9, weight='bold')
-            step += 1
+            subplots[i].xaxis.label.set_fontsize(7)
+            subplots[i].yaxis.label.set_fontsize(7) # <- ends here
+
+        subplots[i].text(-0.1, 1.1, string.ascii_lowercase[i], transform=subplots[i].transAxes, size=9, weight='bold')
 
     plt.show()
-    fig.savefig(run_dir + "\\FigS10.svg", dpi=resolution, transparent=True)
+    fig.savefig(run_dir + "\\FigS9.svg", dpi=resolution, transparent=False)
+    return
 
 
 if __name__ == '__main__':

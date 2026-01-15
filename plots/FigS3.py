@@ -8,181 +8,109 @@ parent_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
 
 def main():
     # params #
-    data = [
-            {
-            "data"      : [],
-            "datatype"  : ["json", "json"],
-            "extensions": [None, None],
-            "features"  : {
-                           "density"            : True,
-                           "fit"                : [False, False],
-                           "fill_area"          : {
-                                                   "color"      : "crimson",
-                                                   "range"      : (0.69, 0.77),
-                                                  },
-                           "labels"             : ["expected NMD efficiencies", "NMD efficiencies of observed PTCs"],
-                           "xcol"               : [["values"], ["FEATURE:prediction_values"]],
-                           "xlabel"             : "NMD susceptibility",
-                           "x_mute"             : True,
-                           "xrange"             : (0.5, 0.8),
-                           "ylabel"             : "rel. counts"
-                        },
-            "paths"     : [parent_dir+r"\data\prediction_analysis_tcga\2025-11-10_18-37-17_tcga_mw\tcga_mw_stats.json"],
-            "separators": [","],
-            "type"      : "step_histogram"
+    data = [{
+             "data"          : [],
+             "datatype"      : ["pandas"],
+             "extensions"    : [None],
+             "features"      : {
+                                "labels"     : ["nonsense"],
+                                "x"          : ["sequence coordinate"],
+                                "xcol"       : [[None]],
+                                "y"          : ["nonsense"],
+                                "xlabel"     : "sequence coordinate",
+                                "ylabel"     : "norm. count"
+                               },
+             "paths"         : [parent_dir+r"\data\prediction_analysis_tcga\2025-07-09_17-24-03_tcga_stop_codons\stop_codon_distribution.txt"],
+             "separators"    : [","],
+             "type"          : "xy_plot"
             },
             {
-            "data"      : [],
-            "datatype"  : ["json", "json", "json"],
-            "extensions": [None, None, None],
-            "features"  : {
-                           "bar_items"          : [None, "FEATURE:ptc cds position_projected_mean_hist"],
-                           "duplicate_axis"     : False,
-                           "labels"             : ["NMDetectiveA", "NMDelphi"],
-                           "offset_correction"  : True,
-                           "offset_items"       : ["projected_mean_hist", "projected_mean_hist"],
-                           "xcol"               : [["projected_mean_hist", "FEATURE:ptc cds position_projected_mean_hist"]],
-                           "xlabel"             : "sequence position / %",
-                           "x_mute"             : True,
-                           "ylabel"             : "NMD susceptibility",
-                           "ylabel2"            : "rel. counts",
-                           "yrange"             : (0.5, 0.8)
-                          },
-            "off"       : False,
-            "paths"     : [parent_dir+r"\data\prediction_analysis_tcga\2025-07-11_13-10-54_tcga_lindeboom\tcga_lindeboom_stats.json",
-                           parent_dir+r"\data\prediction_analysis_tcga\2025-11-10_18-37-17_tcga_mw\tcga_mw_stats.json"],
-            "separators": [","],
-            "to_json"   : True,
-            "type"      : "projections"
+             "data"          : [],
+             "datatype"      : ["pandas"],
+             "extensions"    : [None],
+             "features"      : {
+                                "labels"     : ["frameshift (+1)"],
+                                "x"          : ["sequence coordinate"],
+                                "xcol"       : [[None]],
+                                "y"          : ["frameshift_1"],
+                                "xlabel"     : "sequence coordinate",
+                                "ylabel"     : "norm. count"
+                               },
+             "paths"         : [parent_dir+r"\data\prediction_analysis_tcga\2025-07-09_17-24-03_tcga_stop_codons\stop_codon_distribution.txt"],
+             "separators"    : [","],
+             "type"          : "xy_plot"
             },
             {
-            "data"      : [],
-            "datatype"  : ["json", "json"],
-            "extensions": [None, None],
-            "features"  : {
-                           "density"            : True,
-                           "labels"             : ["expected NMD efficiencies", "NMD efficiencies of observed PTCs"],
-                           "xcol"               : [["first_exon_values"], ["FEATURE:prediction_first_exon_values"]],
-                           "xlabel"             : "NMD susceptibility",
-                           "x_mute"             : True,
-                           "xrange"             : (0.5, 0.8),
-                           "ylabel"             : "rel. counts"
-                          },
-            "paths"     : [parent_dir+r"\data\prediction_analysis_tcga\2025-11-10_18-37-17_tcga_mw\tcga_mw_stats.json"],
-            "separators": [","],
-            "type"      : "step_histogram"
+             "data"          : [],
+             "datatype"      : ["pandas"],
+             "extensions"    : [None],
+             "features"      : {
+                                "labels"     : ["frameshift (+2)"],
+                                "x"          : ["sequence coordinate"],
+                                "xcol"       : [[None]],
+                                "y"          : ["frameshift_2"],
+                                "xlabel"     : "sequence coordinate",
+                                "ylabel"     : "norm. count"
+                               },
+             "paths"         : [parent_dir+r"\data\prediction_analysis_tcga\2025-07-09_17-24-03_tcga_stop_codons\stop_codon_distribution.txt"],
+             "separators"    : [","],
+             "type"          : "xy_plot"
             },
             {
-            "data"      : [],
-            "datatype"  : ["json", "json", "json"],
-            "extensions": [None, None, None],
-            "features"  : {
-                           "bar_items"          : [None, "FEATURE:ptc cds position_projected_first_exon_mean_hist"],
-                           "duplicate_axis"     : False,
-                           "labels"             : ["NMDetectiveA", "NMDelphi"],
-                           "offset_correction"  : True,
-                           "offset_items"       : ["projected_first_exon_mean_hist", "projected_first_exon_mean_hist"],
-                           "xcol"               : [["projected_first_exon_mean_hist", "FEATURE:ptc cds position_projected_first_exon_mean_hist"]],
-                           "xlabel"             : "sequence position / %",
-                           "ylabel"             : "NMD susceptibility",
-                           "ylabel2"            : "rel. counts",
-                           "x_mute"             : True,
-                           "yrange"             : (0.55, 0.65)
-                           },
-            "off"       : False,
-            "paths"     : [parent_dir+r"\data\prediction_analysis_tcga\2025-07-11_13-10-54_tcga_lindeboom\tcga_lindeboom_stats.json",
-                           parent_dir+r"\data\prediction_analysis_tcga\2025-11-10_18-37-17_tcga_mw\tcga_mw_stats.json"],
-            "separators": [","],
-            "to_json"   : True,
-            "type"      : "projections"
+            "data"           : [],
+            "datatype"       : ["pandas"],
+            "extensions"     : [None],
+            "features"       : {
+                               "bar_label"   : "pvalue",
+                               "cmap"        : "viridis_r",
+                                "scale"       : (0, 0.1),
+                               "xcol"        : [[None]],
+                               "xmute"       : False,
+                               "ymute"       : False,
+                               },
+            "off"            : False,
+            "paths"          : [parent_dir+r"\data\prediction_analysis_tcga\2025-07-09_17-24-03_tcga_stop_codons\codon_efficiency_comparison.txt"],
+            "separators"     : [","],
+            "targets"        : ["ks", "mw"],
+            "type"           : "matrix"
             },
             {
-            "data"      : [],
-            "datatype"  : ["json", "json"],
-            "extensions": [None, None],
-            "features"  : {
-                           "density"            : True,
-                           "fill_area"          : {
-                                                   "color"      : "crimson",
-                                                   "range"      : (0.69, 0.77),
-                                                  },
-                           "labels"             : ["expected NMD efficiencies", "NMD efficiencies of observed PTCs"],
-                           "xcol"               : [["middle_exon_values"], ["FEATURE:prediction_middle_exon_values"]],
-                           "xlabel"             : "NMD susceptibility",
-                           "x_mute"             : True,
-                           "xrange"             : (0.5, 0.8),
-                           "ylabel"             : "rel. counts"
-                          },
-            "paths"     : [parent_dir+r"\data\prediction_analysis_tcga\2025-11-10_18-37-17_tcga_mw\tcga_mw_stats.json"],
-            "separators": [","],
-            "type"      : "step_histogram"
+            "data"           : [],
+            "datatype"       : ["pandas"],
+            "extensions"     : [None],
+            "features"       : {
+                                "bar_label"   : "pvalue",
+                                "cmap"        : "viridis_r",
+                                "scale"       : (0, 0.1),
+                                "xcol"        : [[None]],
+                                "xmute"       : False,
+                                "ymute"       : False,
+                               },
+            "off"            : False,
+            "paths"          : [parent_dir+r"\data\prediction_analysis_tcga\2025-07-09_17-24-03_tcga_stop_codons\codon_efficiency_comparison_non_redundant.txt"],
+            "separators"     : [","],
+            "targets"        : ["ks", "mw"],
+            "type"           : "matrix"
             },
             {
-            "data"      : [],
-            "datatype"  : ["json", "json", "json"],
-            "extensions": [None, None, None],
-            "features"  : {
-                           "bar_items"          : [None, "FEATURE:ptc cds position_projected_middle_exon_mean_hist"],
-                           "duplicate_axis"     : False,
-                           "labels"             : ["NMDetectiveA", "NMDelphi"],
-                           "offset_correction"  : True,
-                           "offset_items"       : ["projected_middle_exon_mean_hist", "projected_middle_exon_mean_hist"],
-                           "xcol"               : [["projected_middle_exon_mean_hist", "FEATURE:ptc cds position_projected_middle_exon_mean_hist"]],
-                           "xlabel"             : "sequence position / %",
-                           "ylabel"             : "NMD susceptibility",
-                           "ylabel2"            : "rel. counts",
-                           "x_mute"             : True,
-                           "yrange"             : (0.65, 0.67)
-                          },
-            "off"       : False,
-            "paths"     : [parent_dir+r"\data\prediction_analysis_tcga\2025-07-11_13-10-54_tcga_lindeboom\tcga_lindeboom_stats.json",
-                           parent_dir+r"\data\prediction_analysis_tcga\2025-11-10_18-37-17_tcga_mw\tcga_mw_stats.json"],
-            "separators": [","],
-            "to_json"   : True,
-            "type"      : "projections"
-            },
-            {
-            "data"      : [],
-            "datatype"  : ["json", "json"],
-            "extensions": [None, None],
-            "features"  : {
-                           "density"            : True,
-                           "labels"             : ["expected NMD efficiencies", "NMD efficiencies of observed PTCs"], 
-                           "xcol"               : [["last_exon_values"], ["FEATURE:prediction_last_exon_values"]],
-                           "xlabel"             : "NMD susceptibility",
-                           "xrange"             : (0.5, 0.8),
-                           "ylabel"             : "rel. counts"
-                          },
-            "paths"     : [parent_dir+r"\data\prediction_analysis_tcga\2025-11-10_18-37-17_tcga_mw\tcga_mw_stats.json"],
-            "separators": [","],
-            "type"      : "step_histogram"
-            },
-            {
-            "data"      : [],
-            "datatype"  : ["json", "json", "json"],
-            "extensions": [None, None, None],
-            "features"  : {
-                           "bar_items"          : [None, "FEATURE:ptc cds position_projected_last_exon_mean_hist"],
-                           "duplicate_axis"     : False,
-                           "labels"             : ["NMDetectiveA", "NMDelphi"],
-                           "offset_correction"  : True,
-                           "offset_items"       : ["projected_last_exon_mean_hist", "projected_last_exon_mean_hist"],
-                           "xcol"               : [["projected_last_exon_mean_hist", "FEATURE:ptc cds position_projected_last_exon_mean_hist"]],
-                           "xlabel"             : "sequence position / %",
-                           "ylabel"             : "NMD susceptibility",
-                           "ylabel2"            : "rel. counts",
-                           "yrange"             : (0.52, 0.57)
-                          },
-            "off"       : False,
-            "paths"     : [parent_dir+r"\data\prediction_analysis_tcga\2025-07-11_13-10-54_tcga_lindeboom\tcga_lindeboom_stats.json",
-                           parent_dir+r"\data\prediction_analysis_tcga\2025-11-10_18-37-17_tcga_mw\tcga_mw_stats.json"],
-            "separators": [","],
-            "to_json"   : True,
-            "type"      : "projections"
+            "data"           : [],
+            "datatype"       : ["pandas"],
+            "extensions"     : [None],
+            "features"       : {
+                                "bar_label"   : "norm. count",
+                                "cmap"        : "viridis_r",
+                                "xcol"        : [[None]],
+                                "ylabel"      : "sequence position / %",
+                                "yticks"      : [0, 25, 50, 75, 100],
+                               },
+            "off"            : False,
+            "paths"          : [parent_dir+r"\data\prediction_analysis_tcga\2025-07-09_17-24-03_tcga_stop_codons\codon_distribution.txt"],
+            "separators"     : [","],
+            "type"           : "3d_plot"
             }
         ]
 
-    dims       = [4, 4]
+    dims       = [7, 4]
     resolution = 600
     run_dir    = parent_dir+r"\data\figures"
     data       = [data[i] for i in range(len(data)) if "off" not in data[i] or data[i]["off"] == False]
@@ -195,41 +123,45 @@ def main():
 
     # define figure
     fig = plt.figure(figsize=(180/25.4, 180/25.4), constrained_layout=True)
-    plt.subplots_adjust(wspace=0.30, hspace=0.50)
-
-    gs = fig.add_gridspec(4*dims[0], 2*dims[1])
+    gs = fig.add_gridspec(dims[0], 3*dims[1], wspace=8)
 
     subplots = []
-    for i in range(dims[0]):
-        subplots.append(fig.add_subplot(gs[4*i:4*(i+1), 0:4]))
-        subplots.append(fig.add_subplot(gs[4*i:(4*i+1), 4:8]))
-        subplots.append(fig.add_subplot(gs[(4*i+1):4*(i+1), 4:8]))
+    subplots.append(fig.add_subplot(gs[0:2, 0:4]))
+    subplots.append(fig.add_subplot(gs[0:2, 4:8]))
+    subplots.append(fig.add_subplot(gs[0:2, 8:12]))
+    subplots.append(fig.add_subplot(gs[2, 0:12]))
+    subplots.append(fig.add_subplot(gs[3, 0:12]))
+    subplots.append(fig.add_subplot(gs[4:6, 0:12]))
 
-
-    step = 0; step_size = 0
     for i in range(len(data)):
-        if data[i]["type"] == "projections":
-            if "duplicate_axis" in data[i]["features"] and data[i]["features"]["duplicate_axis"] == True:
-                subplots[step] = pu.plot_projections(subplots[step], data[i]["data"], data[i]["features"])
-                subplots[step].text(-0.1, 1.1, string.ascii_lowercase[i], transform=subplots[step].transAxes, size=9, weight='bold')
-                step_size      = 1
+        if data[i]["type"] == "3d_plot":
+            for col in data[i]["data"][0].columns:
+                max_value               = data[i]["data"][0][col].max()
+                data[i]["data"][0][col] = data[i]["data"][0][col].div(max_value)
 
-            else: # <- added from here
-                subplots[step]   = pu._plot_projections(subplots[step], data[i]["data"], data[i]["features"])
-                subplots[step+1] = pu.plot_projections(subplots[step+1], data[i]["data"], data[i]["features"])
-                subplots[step+1].text(-0.1, 1.1, string.ascii_lowercase[i], transform=subplots[step+1].transAxes, size=9, weight='bold')
-                step_size        = 2
+            subplots[i] = pu.plot_3d(subplots[i], data[i]["data"][0], data[i]["features"])
 
-        if data[i]["type"] == "step_histogram":
-            subplots[step] = pu.plot_step_histogram(subplots[step], data[i]["data"], data[i]["features"])
-            subplots[step].text(-0.1, 1.1, string.ascii_lowercase[i], transform=subplots[step].transAxes, size=9, weight='bold')
-            step_size      = 1
+        if data[i]["type"] == "matrix":
+            cols               = data[i]["data"][0][data[i]["data"][0].columns[0]]
+            data[i]["data"][0] = data[i]["data"][0][data[i]["targets"]].transpose()
+            data[i]["data"][0] = data[i]["data"][0].rename(columns={data[i]["data"][0].columns[j]: cols[j] for j in range(data[i]["data"][0].shape[1])})
+            subplots[i]        = pu.plot_matrix(subplots[i], data[i]["data"][0], data[i]["features"])
 
-        step += step_size
+        if data[i]["type"] == "xy_plot":
+            data[i]["data"][0]["sequence coordinate"] = np.arange(data[i]["data"][0].shape[0])
+            
+            for col in data[i]["features"]["y"]:
+                max_value               = data[i]["data"][0][col].max()
+                data[i]["data"][0][col] = [value/max_value for value in data[i]["data"][0][col]]
+
+            subplots[i] = pu.xy_plot(subplots[i], data[i]["data"][0].iloc[1:data[i]["data"][0].shape[0]-1], data[i]["features"])
+        
+        subplots[i].text(-0.1, 1.1, string.ascii_lowercase[i], transform=subplots[i].transAxes, size=9, weight='bold')
 
     plt.show()
 
-    fig.savefig(run_dir + "\\FigS3.svg", dpi=resolution, transparent=True)
+    fig.savefig(run_dir + "\\FigS2.svg", dpi=resolution)
+    return
 
 
 if __name__ == '__main__':

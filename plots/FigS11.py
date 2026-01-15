@@ -1,36 +1,97 @@
+import os
+
 from plot_load import *
 from plot_utils import *
 from plot_tools import *
 
 parent_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
 
+
 def main():
+    boxplot_colors = []
+    [boxplot_colors.extend(["crimson", "royalblue"]) for _ in range(34)]
+
     # params #
     data = [
             {
-            "data"           : [],
-            "datatype"       : ["pandas", "pandas"],
-            "extensions"     : ["selection_stats", None],
-            "features"       : {
-                               "bar_dimension": ("10%", "10%"),
-                               "bar_label"    : "NMD adaptation",
-                               "cmap"         : "RdBu",
-                               "scale"        : (-1, 1),
-                               "xcol"         : [[None], [None]],
-                               "xlabels"      : [],
-                               "xmute"        : False,
-                               "ymute"        : False,
+            "data"          : [],
+            "datatype"      : ["pandas", "pandas"],
+            "extensions"    : [None, None],
+            "features"      : {
+                              "bar_label"   : "sample \n fraction",
+                              "cmap"        : "Blues",
+                              "tag"         : "escape",
+                              "xcol"        : [[None], [None]],
+                              "xmute"       : True,
+                              "ymute"       : True,
+                              "ycol"        : "block id"
                                },
-            "off"            : False,
-            "paths"          : [[parent_dir+r"\data\prediction_analysis_msk\2025-11-14_18-47-20_msk_projectwise\2025-11-15_11-29-47_binomial"],
-                                [parent_dir+r"\data\prediction_analysis_msk\2025-11-14_18-46-51_msk\2025-11-15_11-28-36_binomial\selection_stats.txt"]],
-            "separators"     : [",", ","],
-            "target_col"     : "binomial-statistic FEATURE:prediction",
-            "type"           : "matrix"
+            "off"           : False,
+            "paths"         : [[parent_dir+r"\data\prediction_analysis_msk\2025-11-14_18-46-51_msk\2025-11-15_11-28-36_binomial\selection_stats.txt"],
+                               [parent_dir+r"\data\msk_chord_2024\msk_chord_zeros_included_filtered_appended.txt"]],
+            "separators"    : [",", ","],
+            "type"          : "matrix"
+            },
+            {
+            "data"          : [],
+            "datatype"      : ["pandas", "pandas"],
+            "extensions"    : [None, None],
+            "features"      : {
+                              "bar_label"   : "sample \n fraction",
+                              "cmap"        : "twilight",
+                              "tag"         : "escape",
+                              "xcol"        : [[None], [None]],
+                              "xmute"       :  True,
+                              "ycol"        : "block id"
+                               },
+            "off"           : False,
+            "paths"         : [[parent_dir+r"\data\prediction_analysis_msk\2025-11-14_18-46-51_msk\2025-11-15_11-28-36_binomial\selection_stats.txt"],
+                               [parent_dir+r"\data\TCGA.PanCancer.onco.genes.OncoVar.tsv"]],
+            "separators"    : [",", "\t"],
+            "target_cols"   : ["OncoKB", "2020Rule", "CTAT"],
+            "type"          : "matrix2"
+            },
+            {
+            "data"          : [],
+            "datatype"      : ["pandas", "pandas"],
+            "extensions"    : [None, None],
+            "features"      : {
+                              "bar_label"   : "sample \n fraction",
+                              "cmap"        : "Reds",
+                              "tag"         : "target",
+                              "xcol"        : [[None], [None]],
+                              "ycol"        : "block id",
+                              "ymute"       : True
+                               },
+            "off"           : False,
+            "paths"         : [[parent_dir+r"\data\prediction_analysis_msk\2025-11-14_18-46-51_msk\2025-11-15_11-28-36_binomial\selection_stats.txt"],
+                               [parent_dir+r"\data\msk_chord_2024\msk_chord_zeros_included_filtered_appended.txt"]],
+            "separators"    : [",", ","],
+            "type"          : "matrix"
+            },
+            {
+            "data"          : [],
+            "datatype"      : ["pandas", "pandas"],
+            "extensions"    : [None, None],
+            "features"      : {
+                              "bar_label"   : "sample \n fraction",
+                              "cmap"        : "twilight",
+                              "scale"       : (0, 0.5),
+                              "tag"         : "target",
+                              "xcol"        : [[None], [None]],
+                              "xmute"       :  True,
+                              "ycol"        : "block id"
+                               },
+            "off"           : False,
+            "paths"         : [[parent_dir+r"\data\prediction_analysis_msk\2025-11-14_18-46-51_msk\2025-11-15_11-28-36_binomial\selection_stats.txt"],
+                               [parent_dir+r"\data\TCGA.PanCancer.onco.genes.OncoVar.tsv"]],
+            "separators"    : [",", "\t"],
+            "target_cols"   : ["OncoKB", "2020Rule", "CTAT"],
+            "type"          : "matrix2"
             },
         ]
 
-    dims       = (14, 2)
+    dims       = (7, 4)
     resolution = 600
     run_dir    = parent_dir+r"\data\figures"
 
@@ -41,65 +102,72 @@ def main():
 
     # define figure
     fig = plt.figure(figsize=(180/25.4, 180/25.4), constrained_layout=True)
-    gs  = fig.add_gridspec(dims[0], 3*dims[1])
+    gs  = fig.add_gridspec(dims[0], 3*dims[1]+1, wspace=2)
 
     subplots = []
-    subplots.append(fig.add_subplot(gs[0:7, 0:2]))
-    subplots.append(fig.add_subplot(gs[0:7, 2:4]))
-    subplots.append(fig.add_subplot(gs[0:7, 4:6]))
-    subplots.append(fig.add_subplot(gs[7:, 0:2]))
-    subplots.append(fig.add_subplot(gs[7:, 2:4]))
-    subplots.append(fig.add_subplot(gs[7:, 4:6]))
+    subplots.append(fig.add_subplot(gs[0:2, 1:4]))
+    subplots.append(fig.add_subplot(gs[0:2, 0:1]))
+    subplots.append(fig.add_subplot(gs[2:4, 1:4]))
+    subplots.append(fig.add_subplot(gs[2:4, 0:1]))
 
+    for i in range(3):
+        subplots.append(fig.add_subplot(gs[4+i, :]))
+
+    step = 0
     for i in range(len(data)):
-        if data[i]["type"] == "matrix":
-            # initialize dataframe based on sorted projects (barplot1)
-            assembled_data = pd.DataFrame()
+        if data[i]["type"] == "matrix" or data[i]["type"] == "matrix2":
+            # aggregated value contains 
+            if data[i]["features"]["tag"] == "escape":
+                selected_data = data[i]["data"][0][[True if data[i]["data"][0].iloc[j].loc["binomial-statistic FEATURE:prediction"] > 0 else False
+                                                    for j in range(data[i]["data"][0].shape[0])]]
+                selected_data = selected_data[selected_data["block id"] != "total"]
+                selected_data = selected_data.sort_values(by=data[i]["features"]["tag"], ascending=False).iloc[0:15]
             
-            for j in range(len(data[i]["data"])):                    
-                names = data[i]["features"]["xlabels"][j].split("\\")
-                path  = "".join(names[k]+"\\" if k < len(names)-2 else names[k] for k in range(len(names)-1))
-                fname = names[-1].split("_")[-1].split(".")[0]             
-                data[i]["features"]["xlabels"].append(fname)
+            if data[i]["features"]["tag"] == "target":
+                selected_data = data[i]["data"][0][[True if data[i]["data"][0].iloc[j].loc["binomial-statistic FEATURE:prediction"] < 0 else False
+                                                    for j in range(data[i]["data"][0].shape[0])]]
+                selected_data = selected_data[selected_data["block id"] != "total"]
+                selected_data = selected_data.sort_values(by=data[i]["features"]["tag"], ascending=False).iloc[0:15]
 
-                if path in np.ravel(data[i]["paths"]).tolist(): index = np.ravel(data[i]["paths"]).tolist().index(path)
-                else:                                           index = np.ravel(data[i]["paths"]).tolist().index(data[i]["features"]["xlabels"][j])
-                if index % 2 == 0:                              project = fname.replace("TCGA", "")            
-                elif index == 1 or index % 2 == 1:              project = "all"
+            selected_data.index = [selected_data.iloc[i].loc["block id"] for i in range(selected_data.shape[0])]
+            selected_cols       = [col for col in selected_data.columns if data[i]["features"]["tag"] in col
+                                    and "relative" not in col and "Cancer" in col]
+            selected_data       = selected_data[selected_cols]
 
-                for k in range(len(data[i]["data"][j])):
-                    if data[i]["data"][j].iloc[k].loc["block id"] != "total":
-                        # avoid duplicates (can occur for gene symbols)
-                        if project+"_"+data[i]["data"][j].iloc[k].loc["block id"] not in assembled_data.index:
-                            current_data = pd.DataFrame({"project":                        [project],
-                                                         "gene symbol":                     [data[i]["data"][j].iloc[k].loc["block id"]],
-                                                         data[i]["target_col"]:             [data[i]["data"][j].iloc[k].loc[data[i]["target_col"]]]},
-                                                         index=[project+"_"+data[i]["data"][j].iloc[k].loc["block id"]])
+            # add mean value
+            selected_data["all"] = selected_data.mean(axis=1)
+            selected_data        = selected_data.rename(columns={col: col.split("_")[1] for col in selected_cols})
+            data[i]["data"][0]   = selected_data            
 
-                            if assembled_data.shape[0] > 0: assembled_data = pd.concat([assembled_data, current_data])
-                            else:                           assembled_data = current_data
 
-            unique_gene_symbols = sorted(np.unique(assembled_data["gene symbol"]))
-            unique_projects     = sorted(np.unique(assembled_data["project"]))
-
-            rearranged_data     = pd.DataFrame({unique_project: [assembled_data.at[unique_project+"_"+unique_gene_symbol, data[i]["target_col"]]
-                                                                 if unique_project+"_"+unique_gene_symbol in assembled_data.index else 0
-                                                                 for unique_gene_symbol in unique_gene_symbols] for unique_project in unique_projects},
-                                                index=unique_gene_symbols)
-            
-
-            for j in rearranged_data.index:
-                if (len([rearranged_data.loc[j].loc[col] for col in rearranged_data.columns if rearranged_data.loc[j].loc[col] < 0]) > 0
-                    and len([rearranged_data.loc[j].loc[col] for col in rearranged_data.columns if rearranged_data.loc[j].loc[col] > 0])):
-                    print("< ambiguous trend:", j)
-
-            index = split_index(rearranged_data.shape[0], len(subplots))
-
-            for k in range(len(index)):
-                subplots[i+k] = pu.plot_matrix(subplots[i+k], rearranged_data.iloc[index[k][0]:index[k][1]], data[i]["features"])
+            if data[i]["type"] == "matrix":
+                # determine cancer type-specific counts
+                cancer_types   = np.unique(data[i]["data"][1]["ID:CANCER_TYPE"])
+                patient_counts = {**{cancer_type: data[i]["data"][1][data[i]["data"][1]["ID:CANCER_TYPE"] == cancer_type].shape[0] for cancer_type in cancer_types},
+                                  **{"all": data[i]["data"][1].shape[0]}}
                 
+                print(json.dumps(patient_counts, indent=4))
+                
+                for col in data[i]["data"][0].columns:
+                    data[i]["data"][0][col] = [data[i]["data"][0].iloc[j].loc[col] / patient_counts[col] for j in range(data[i]["data"][0].shape[0])]
+
+                subplots[i] = pu.plot_matrix(subplots[i], data[i]["data"][0], data[i]["features"])
+
+
+            if data[i]["type"] == "matrix2":
+                data[i]["data"][1].index = data[i]["data"][1]["Gene_symbol"]
+                data[i]["data"][0]       = pd.concat(data[i]["data"], axis=1)
+                data[i]["data"][0]       = data[i]["data"][0].loc[selected_data.index]
+                data[i]["data"][0]       = data[i]["data"][0].drop(columns=[col for col in data[i]["data"][0].columns if col not in data[i]["target_cols"]])
+                data[i]["data"][0]       = data[i]["data"][0].replace({np.nan: 0, "Y": 0.3, "N": 0, "Pssible_Oncogene": 0.4, "Pssible_TSG": 0.2, "Oncogene": 0.4, "Oncogene/TSG": 0.3, "TSG": 0.2}).astype(float)
+                subplots[i] = pu.plot_matrix(subplots[i], data[i]["data"][0], data[i]["features"])
+        
+        if data[i]["type"] != "matrix2":
+            subplots[i].text(-0.1, 1.1, string.ascii_lowercase[step], transform=subplots[i].transAxes, size=9, weight='bold')
+            step += 1
+
     plt.show()
-    fig.savefig(run_dir + "\\FigS11.svg", dpi=resolution, transparent=True)
+    fig.savefig(run_dir + "\\FigS10.svg", dpi=resolution, transparent=True)
 
 
 if __name__ == '__main__':

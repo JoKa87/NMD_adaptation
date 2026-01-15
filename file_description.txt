@@ -1,13 +1,8 @@
 < internal data
 filename						description
 cptac3_mutation_stats.json				mutation statistics derived from TCGA
-cptac3_survival_data.tsv				CPTAC-3 survival data
 cptac3_variants.txt					PTC variants of the CPTAC-3 dataset
-hg19_knownGene.txt					hg19 build version, downloaded from UCSC
-hg38_knownGene.txt					hg38 build version, downloaded from UCSC
-hg38_knownGene_old.txt					older hg38 build version, downloaded from UCSC, used for CNV correction
 hg38_NMD_susceptibilities.txt				susceptibility predictions created with NMDelphi
-hg38_seqs.txt						extracted coding sequences for hg38
 model_test_variants.txt				^	PTC variants of test dataset (ASE calls from Cuomo et al.)*
 model_training_variants.txt				PTC variants of training dataset (ASE calls from Teran et al.)*
 model_training_variants_full.txt			PTC variants of training dataset (ASE calls from Teran et al.) with redundant PTC variants (used for estimating maximum achievable performance)*
@@ -32,7 +27,11 @@ ase_aggregated_by_donor_open_access_lines (folder)	variant calls from Cuomo et a
 							downloaded from https://zenodo.org/records/3625024#.Xil-0y2cZ0s
 cptac3_survival_data.tsv				CPTAC-3 clinical data
 hg19.fa							hg19 sequences, downloaded from https://hgdownload.cse.ucsc.edu/goldenpath/hg19/bigZips/, reformatted using shared/tools.py, mode="convert_genomes"
+hg19_knownGene.txt					hg19 build version, downloaded from UCSC
+hg38_knownGene.txt					hg38 build version, downloaded from UCSC
+hg38_knownGene_old.txt					older hg38 build version, downloaded from UCSC, used for CNV correction
 hg38.p14.fa						hg38 sequences, downloaded from https://hgdownload.cse.ucsc.edu/goldenpath/hg38/bigZips/p14/, reformatted using shared/tools.py, mode="convert_genomes"
+hg38_seqs.txt						extracted coding sequences for hg38
 hg19_NMDetectiveA_Lindeboom_et_al.v2.gtf		NMDetectiveA predictions for hg19, Lindeboom et al. 2019, downloaded from https://figshare.com/articles/dataset/NMDetective/7803398
 hg38_NMDetectiveA_Lindeboom_et_al.v2.gtf		NMDetectiveA predictions for hg38, Lindeboom et al. 2019, downloaded from https://figshare.com/articles/dataset/NMDetective/7803398
 hg38_lindeboom_predictions.txt				restructured NMDetectiveA predictions for hg38, calculated by random_forest/analyze_predictions, mode="convert_lindeboom_predictions"

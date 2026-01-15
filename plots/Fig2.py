@@ -54,7 +54,7 @@ def main():
                                 "pred_threshold":       0.57
                                },
              "off"           : False,
-             "paths"         : [r"C:\Programming\Translational_genomics\NMD_analysis\data\control_filtered.txt"],
+             "paths"         : [parent_dir+r"\data\nmd_inhibition_variants.txt"],
              "separators"    : [","],
              "type"          : "box_plot"
             }
